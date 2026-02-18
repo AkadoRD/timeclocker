@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Employee Clock</title>
+  <link rel="manifest" href="manifest.json">
+
+
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+    text-align: center;
+    background-color: #f5f6fa;
+  }
+
+  #clockContainer {
+    margin-top: 30px;
+  }
+
+  #date {
+    font-size: 18px;
+    margin-bottom: 5px;
+  }
+
+  #clock {
+    font-size: 36px;
+    font-weight: bold;
+    margin-bottom: 20px;
+  }
+
+  label {
+    font-size: 18px;
+  }
+
+  input {
+    font-size: 24px;
+    padding: 12px;
+    width: 220px;
+    text-align: center;
+    margin-top: 15px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+  }
+
+  button {
+    font-size: 22px;
+    padding: 15px 25px;
+    margin: 10px;
+    cursor: pointer;
+    border-radius: 6px;
+    border: none;
+  }
+
+  button:hover {
+    opacity: 0.9;
+  }
+
+  #msg {
+    margin-top: 20px;
+    font-size: 18px;
+    font-weight: bold;
+    min-height: 24px;
+  }
+
+  /* Quitar flechas en Chrome, Edge, Safari */
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  /* Quitar flechas en Firefox */
+  input[type=number] {
+    -moz-appearance: textfield;
+  }
+</style>
+
+</head>
+<body>
+
+ <div id="clockContainer">
+  <div id="date"></div>
+  <div id="clock"></div>
+</div>
+
+
+  <div>
+    <label>Employee ID</label><br><br>
+    <input id="empId" type="number" placeholder="Enter Employee ID" min="0" max="9999" step="1" inputmode="numeric"
+  pattern="[0-9]*" oninput="if(this.value.length > 4) this.value = this.value.slice(0,4);">
+
+  </div>
+
+  <br>
+
+  <button onclick="clockIn()">Clock In</button>
+  <button onclick="clockOut()">Clock Out</button>
+
+  <p id="msg"></p>
+
+
+<script>
+const _supabase = supabase.createClient(
+  "https://jqppakaodpgbtxzpvsti.supabase.co",
+  "sb_publishable_ZwLCHMtM9uCfBFkwBcSSEQ_zQVq1RwI"
+);
+
+// Reloj NJ
+function updateClock() {
+  const now = new Date();
+  const time = now.toLocaleTimeString("en-US", {
+    timeZone: "America/New_York",
+    hour12: true
+  });
+  document.getElementById("clock").innerText = time;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+function clearInput() {
+  document.getElementById("empId").value = "";
+}
+
+async function employeeExists(empId) {
+  const { data } = await _supabase
+    .from("employees")
+    .select("employee_id")
+    .eq("employee_id", empId)
+    .single();
+
+  return !!data;
+}
+function updateClock() {
+  const now = new Date();
+
+  const timeOptions = {
+    timeZone: "America/New_York",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true
+  };
+
+  const dateOptions = {
+    timeZone: "America/New_York",
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric"
+  };
+
+  document.getElementById("clock").innerText =
+    now.toLocaleTimeString("en-US", timeOptions);
+
+  document.getElementById("date").innerText =
+    now.toLocaleDateString("en-US", dateOptions);
+}
+
+setInterval(updateClock, 1000);
+updateClock();
+
+
+// Obtener inicio de semana (domingo)
+function getWeekStart(date) {
+  const d = new Date(date);
+  const day = d.getDay(); // 0 = Sunday
+  const diff = d.getDate() - day;
+  const weekStart = new Date(d.setDate(diff));
+  weekStart.setHours(0,0,0,0);
+  return weekStart.toISOString();
+}
+
+async function clockIn() {
+  const empId = document.getElementById("empId").value.trim();
+  if (!empId) return alert("Enter ID");
+
+  const msg = document.getElementById("msg");
+
+  const exists = await employeeExists(empId);
+  if (!exists) {
+    msg.innerText = "Employee not found";
+    return;
+  }
+
+  const { data: openEntry } = await _supabase
+    .from("time_entries")
+    .select("id")
+    .eq("employee_id", empId)
+    .is("clock_out", null)
+    .maybeSingle();
+
+  if (openEntry) {
+    msg.innerText = "Already checked in";
+    return;
+  }
+
+  const { error } = await _supabase
+    .from("time_entries")
+    .insert([{
+      employee_id: empId,
+      clock_in: new Date().toISOString()
+    }]);
+
+  if (error) {
+    msg.innerText = error.message;
+  } else {
+    msg.innerText = "Checked In";
+    clearInput();
+  }
+}
+
+async function clockOut() {
+  const empId = document.getElementById("empId").value.trim();
+  if (!empId) return alert("Enter ID");
+
+  const msg = document.getElementById("msg");
+
+  const exists = await employeeExists(empId);
+  if (!exists) {
+    msg.innerText = "Employee not found";
+    return;
+  }
+
+  // Buscar entrada abierta
+  const { data: openEntry } = await _supabase
+    .from("time_entries")
+    .select("id, clock_in")
+    .eq("employee_id", empId)
+    .is("clock_out", null)
+    .maybeSingle();
+
+  if (!openEntry) {
+    msg.innerText = "No active check-in";
+    return;
+  }
+
+  const clockOutISO = new Date().toISOString();
+
+  // Calcular horas del turno
+  const clockInTime = new Date(openEntry.clock_in + "Z");
+  const clockOutTime = new Date(clockOutISO);
+  const shiftHours = (clockOutTime - clockInTime) / 3600000;
+
+  // Obtener inicio de semana (domingo)
+  const weekStart = getWeekStart(clockOutTime);
+
+  // Obtener horas acumuladas de la semana
+  const { data: weekEntries } = await _supabase
+    .from("time_entries")
+    .select("regular_hours, overtime_hours")
+    .eq("employee_id", empId)
+    .gte("clock_in", weekStart);
+
+  let weekTotal = 0;
+
+  if (weekEntries) {
+    weekEntries.forEach(entry => {
+      weekTotal += Number(entry.regular_hours || 0);
+      weekTotal += Number(entry.overtime_hours || 0);
+    });
+  }
+
+  // Calcular regular vs overtime
+  let regularHours = 0;
+  let overtimeHours = 0;
+
+  if (weekTotal >= 40) {
+    overtimeHours = shiftHours;
+  } else if (weekTotal + shiftHours <= 40) {
+    regularHours = shiftHours;
+  } else {
+    regularHours = 40 - weekTotal;
+    overtimeHours = shiftHours - regularHours;
+  }
+
+  regularHours = Number(regularHours.toFixed(4));
+  overtimeHours = Number(overtimeHours.toFixed(4));
+
+  // Actualizar registro
+  const { error } = await _supabase
+    .from("time_entries")
+    .update({
+      clock_out: clockOutISO,
+      total_hours: Number(shiftHours.toFixed(4)),
+      regular_hours: regularHours,
+      overtime_hours: overtimeHours
+    })
+    .eq("id", openEntry.id);
+
+  if (error) {
+    msg.innerText = error.message;
+  } else {
+    msg.innerText = `Out: ${regularHours} reg / ${overtimeHours} OT`;
+    clearInput();
+  }
+}
+</script>
+
+
+
+
+
+
+</body>
+</html>
