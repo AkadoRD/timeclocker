@@ -404,6 +404,44 @@ history.pushState(null, null, location.href);
 window.addEventListener("popstate", function () {
   history.pushState(null, null, location.href);
 });
+
+// ===== MODO ADMIN =====
+
+let adminTimer;
+
+// Mantener presionado el reloj
+const clockElement = document.getElementById("clock");
+
+clockElement.addEventListener("touchstart", () => {
+  adminTimer = setTimeout(openAdmin, 3000);
+});
+
+clockElement.addEventListener("touchend", () => {
+  clearTimeout(adminTimer);
+});
+
+clockElement.addEventListener("mousedown", () => {
+  adminTimer = setTimeout(openAdmin, 3000);
+});
+
+clockElement.addEventListener("mouseup", () => {
+  clearTimeout(adminTimer);
+});
+
+function openAdmin() {
+  const pin = prompt("Enter Admin PIN");
+
+  if (pin === "1234") {
+    alert("Admin Mode Activated");
+    showAdminPanel();
+  } else if (pin !== null) {
+    alert("Wrong PIN");
+  }
+}
+
+function showAdminPanel() {
+  alert("Admin panel coming next step");
+}
 </script>
 </body>
 </html>
