@@ -244,7 +244,17 @@ updateClock();
 function clearInput() { document.getElementById("empId").value = ""; }
 
 async function employeeExists(empId) {
-  const { data } = await _supabase.from("employees").select("employee_id").eq("employee_id", empId).single();
+  // Si está offline, asumimos que el empleado existe
+  if (!navigator.onLine) {
+    return true;
+  }
+
+  const { data } = await _supabase
+    .from("employees")
+    .select("employee_id")
+    .eq("employee_id", empId)
+    .single();
+
   return !!data;
 }
 
