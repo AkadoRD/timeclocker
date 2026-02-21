@@ -248,20 +248,24 @@ updateClock();
 function clearInput() { document.getElementById("empId").value = ""; }
 
 async function employeeExists(empId) {
-  // Si está offline, asumimos que el empleado existe
+  // Si no hay internet, asumir que el empleado es válido
   if (!navigator.onLine) {
     return true;
   }
 
-  const { data } = await _supabase
+  const { data, error } = await _supabase
     .from("employees")
     .select("employee_id")
     .eq("employee_id", empId)
     .single();
 
+  if (error) {
+    console.log("Error verificando empleado:", error.message);
+    return false;
+  }
+
   return !!data;
 }
-
 function getWeekStart(date) {
   const d = new Date(date);
   const day = d.getDay();
@@ -394,6 +398,11 @@ document.addEventListener('visibilitychange', () => {
   if (wakeLock !== null && document.visibilityState === 'visible') {
     keepScreenOn();
   }
+});
+
+history.pushState(null, null, location.href);
+window.addEventListener("popstate", function () {
+  history.pushState(null, null, location.href);
 });
 </script>
 </body>
