@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <meta name="theme-color" content="#ffffff">
   <title>Employee Clock</title>
   <link rel="manifest" href="./manifest.json">
@@ -74,13 +74,17 @@ syncOfflineEntries();
 
     body {
       margin: 0;
-      font-family: 'Inter', -apple-system, sans-serif;
-      background-color: var(--bg-color);
-      color: var(--text-main);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
+  font-family: 'Inter', -apple-system, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+
+  overflow: hidden;
+  user-select: none;
+  touch-action: manipulation;
     }
 
     #mainCard {
@@ -367,6 +371,30 @@ async function clockOut() {
     clearInput();
   }
 }
+
+// Mantener pantalla encendida (Screen Wake Lock)
+let wakeLock = null;
+
+async function keepScreenOn() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      console.log("Pantalla bloqueada (wake lock activo)");
+    }
+  } catch (err) {
+    console.log("Wake lock no soportado:", err);
+  }
+}
+
+// Activar cuando la app cargue
+window.addEventListener('load', keepScreenOn);
+
+// Reactivar si el usuario vuelve a la app
+document.addEventListener('visibilitychange', () => {
+  if (wakeLock !== null && document.visibilityState === 'visible') {
+    keepScreenOn();
+  }
+});
 </script>
 </body>
 </html>
