@@ -3,179 +3,254 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#000000">
+  <meta name="theme-color" content="#ffffff">
   <title>Employee Clock</title>
-  <link rel="manifest" href="manifest.json">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
 
-
-  <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
   <script>
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js");
+
+    function isOnline() {
+  return navigator.onLine;
 }
-</script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js")
+          .then(() => console.log("SW registrado"))
+          .catch(err => console.log("Error SW:", err));
+      });
+    }
+    function saveOfflineEntry(entry) {
+  let pending = JSON.parse(localStorage.getItem("pendingEntries")) || [];
+  pending.push(entry);
+  localStorage.setItem("pendingEntries", JSON.stringify(pending));
+}
+
+async function syncOfflineEntries() {
+  let pending = JSON.parse(localStorage.getItem("pendingEntries")) || [];
+
+  if (pending.length === 0) return;
+
+  let remaining = [];
+
+  for (let entry of pending) {
+    const { error } = await _supabase
+      .from("time_entries")
+      .insert([entry]);
+
+    if (error) {
+      remaining.push(entry);
+    }
+  }
+
+  if (remaining.length > 0) {
+    localStorage.setItem("pendingEntries", JSON.stringify(remaining));
+  } else {
+    localStorage.removeItem("pendingEntries");
+  }
+}
+window.addEventListener("online", () => {
+  console.log("Internet restaurado. Sincronizando...");
+  syncOfflineEntries();
+});
+syncOfflineEntries();
+  </script>
 
   <style>
-  body {
-    margin: 0;
-    padding: 0;
-    font-family: Arial, sans-serif;
-    text-align: center;
-    background-color: #f5f6fa;
-  }
+    :root {
+      --bg-color: #f8f9fa;
+      --card-bg: #ffffff;
+      --primary: #2cb3ba; /* Azul suave */
+      --text-main: #2f3640;
+      --text-muted: #7f8c8d;
+      --border: #dcdde1;
+      --success-soft: #ebfbee;
+      --success-text: #21b9bc;
+      --error-soft: #fff5f5;
+      --error-text: #cc8a27;
+    }
 
-  #clockContainer {
-    margin-top: 30px;
-  }
+    body {
+      margin: 0;
+      font-family: 'Inter', -apple-system, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
 
-  #date {
-    font-size: 18px;
-    margin-bottom: 5px;
-  }
+    #mainCard {
+      background: var(--card-bg);
+      width: 90%;
+      max-width: 450px;
+      padding: 3rem 2rem;
+      border-radius: 24px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.05);
+      text-align: center;
+    }
 
-  #clock {
-    font-size: 36px;
-    font-weight: bold;
-    margin-bottom: 20px;
-  }
+    #clockContainer {
+      margin-bottom: 2.5rem;
+    }
 
-  label {
-    font-size: 18px;
-  }
+    #date {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+    }
 
-  input {
-    font-size: 24px;
-    padding: 12px;
-    width: 220px;
-    text-align: center;
-    margin-top: 15px;
-    border-radius: 6px;
-    border: 1px solid #ccc;
-  }
+    #clock {
+      font-size: 3.5rem;
+      font-weight: 700;
+      color: var(--primary);
+      font-variant-numeric: tabular-nums;
+    }
 
-  button {
-    font-size: 22px;
-    padding: 15px 25px;
-    margin: 10px;
-    cursor: pointer;
-    border-radius: 6px;
-    border: none;
-  }
+    .input-group {
+      margin-bottom: 2rem;
+    }
 
-  button:hover {
-    opacity: 0.9;
-  }
+    label {
+      display: block;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 0.8rem;
+    }
 
-  #msg {
-    margin-top: 20px;
-    font-size: 18px;
-    font-weight: bold;
-    min-height: 24px;
-  }
+    input#empId {
+      width: 100%;
+      padding: 1rem;
+      font-size: 2rem;
+      border: 2px solid var(--border);
+      border-radius: 16px;
+      text-align: center;
+      background: #fdfdfd;
+      transition: all 0.2s;
+      box-sizing: border-box;
+      outline: none;
+    }
 
-  /* Quitar flechas en Chrome, Edge, Safari */
-  input[type=number]::-webkit-outer-spin-button,
-  input[type=number]::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-  }
+    input#empId:focus {
+      border-color: var(--primary);
+      background: #fff;
+      box-shadow: 0 0 0 4px rgba(74, 105, 189, 0.1);
+    }
 
-  /* Quitar flechas en Firefox */
-  input[type=number] {
-    -moz-appearance: textfield;
-  }
-</style>
+    .button-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
 
+    button {
+      padding: 1.2rem;
+      font-size: 1.1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    /* Botón Clock In */
+    button[onclick="clockIn()"] {
+      background-color: #eb8e55;
+      color: white;
+      border: 1px solid var(--border);
+    }
+
+    button[onclick="clockIn()"]:active {
+      background-color: #e9ecef;
+    }
+
+    /* Botón Clock Out */
+    button[onclick="clockOut()"] {
+      background-color: var(--primary);
+      color: white;
+    }
+
+    button[onclick="clockOut()"]:active {
+      opacity: 0.9;
+      transform: translateY(2px);
+    }
+
+    #msg {
+      margin-top: 2rem;
+      font-size: 1rem;
+      min-height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 12px;
+      font-weight: 500;
+    }
+
+    /* Estilos para mensajes según el contenido */
+    .msg-success { background: var(--success-soft); color: var(--success-text); }
+    .msg-error { background: var(--error-soft); color: var(--error-text); }
+
+    input[type=number]::-webkit-outer-spin-button,
+    input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { -moz-appearance: textfield; }
+  </style>
 </head>
 <body>
 
- <div id="clockContainer">
-  <div id="date"></div>
-  <div id="clock"></div>
-</div>
+  <div id="mainCard">
+    <div id="clockContainer">
+      <div id="date"></div>
+      <div id="clock"></div>
+    </div>
 
+    <div class="input-group">
+      <label>Employee ID</label>
+      <input id="empId" type="number" placeholder="0000" min="0" max="9999" step="1" inputmode="numeric"
+      pattern="[0-9]*" oninput="if(this.value.length > 4) this.value = this.value.slice(0,4);">
+    </div>
 
-  <div>
-    <label>Employee ID</label><br><br>
-    <input id="empId" type="number" placeholder="Enter Employee ID" min="0" max="9999" step="1" inputmode="numeric"
-  pattern="[0-9]*" oninput="if(this.value.length > 4) this.value = this.value.slice(0,4);">
+    <div class="button-group">
+      <button onclick="clockIn()">Clock In</button>
+      <button onclick="clockOut()">Clock Out</button>
+    </div>
 
+    <p id="msg"></p>
   </div>
 
-  <br>
-
-  <button onclick="clockIn()">Clock In</button>
-  <button onclick="clockOut()">Clock Out</button>
-
-  <p id="msg"></p>
-
-
 <script>
+// --- TU LÓGICA DE SUPABASE (SIN CAMBIOS) ---
 const _supabase = supabase.createClient(
   "https://jqppakaodpgbtxzpvsti.supabase.co",
   "sb_publishable_ZwLCHMtM9uCfBFkwBcSSEQ_zQVq1RwI"
 );
 
-// Reloj NJ
 function updateClock() {
   const now = new Date();
-  const time = now.toLocaleTimeString("en-US", {
-    timeZone: "America/New_York",
-    hour12: true
-  });
-  document.getElementById("clock").innerText = time;
+  const timeOptions = { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true };
+  const dateOptions = { timeZone: "America/New_York", weekday: "long", year: "numeric", month: "long", day: "numeric" };
+  document.getElementById("clock").innerText = now.toLocaleTimeString("en-US", timeOptions);
+  document.getElementById("date").innerText = now.toLocaleDateString("en-US", dateOptions);
 }
 setInterval(updateClock, 1000);
 updateClock();
 
-function clearInput() {
-  document.getElementById("empId").value = "";
-}
+function clearInput() { document.getElementById("empId").value = ""; }
 
 async function employeeExists(empId) {
-  const { data } = await _supabase
-    .from("employees")
-    .select("employee_id")
-    .eq("employee_id", empId)
-    .single();
-
+  const { data } = await _supabase.from("employees").select("employee_id").eq("employee_id", empId).single();
   return !!data;
 }
-function updateClock() {
-  const now = new Date();
 
-  const timeOptions = {
-    timeZone: "America/New_York",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true
-  };
-
-  const dateOptions = {
-    timeZone: "America/New_York",
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric"
-  };
-
-  document.getElementById("clock").innerText =
-    now.toLocaleTimeString("en-US", timeOptions);
-
-  document.getElementById("date").innerText =
-    now.toLocaleDateString("en-US", dateOptions);
-}
-
-setInterval(updateClock, 1000);
-updateClock();
-
-
-// Obtener inicio de semana (domingo)
 function getWeekStart(date) {
   const d = new Date(date);
-  const day = d.getDay(); // 0 = Sunday
+  const day = d.getDay();
   const diff = d.getDate() - day;
   const weekStart = new Date(d.setDate(diff));
   weekStart.setHours(0,0,0,0);
@@ -185,38 +260,42 @@ function getWeekStart(date) {
 async function clockIn() {
   const empId = document.getElementById("empId").value.trim();
   if (!empId) return alert("Enter ID");
-
   const msg = document.getElementById("msg");
+  msg.className = ""; 
 
   const exists = await employeeExists(empId);
   if (!exists) {
     msg.innerText = "Employee not found";
+    msg.classList.add("msg-error");
     return;
   }
 
-  const { data: openEntry } = await _supabase
-    .from("time_entries")
-    .select("id")
-    .eq("employee_id", empId)
-    .is("clock_out", null)
-    .maybeSingle();
-
+  const { data: openEntry } = await _supabase.from("time_entries").select("id").eq("employee_id", empId).is("clock_out", null).maybeSingle();
   if (openEntry) {
     msg.innerText = "Already checked in";
+    msg.classList.add("msg-error");
     return;
   }
 
-  const { error } = await _supabase
-    .from("time_entries")
-    .insert([{
-      employee_id: empId,
-      clock_in: new Date().toISOString()
-    }]);
+  const entry = {
+  employee_id: empId,
+  clock_in: new Date().toISOString()
+};
 
+if (!isOnline()) {
+  saveOfflineEntry(entry);
+  msg.innerText = "Saved offline";
+  clearInput();
+  return;
+}
+
+const { error } = await _supabase.from("time_entries").insert([entry]);
   if (error) {
     msg.innerText = error.message;
+    msg.classList.add("msg-error");
   } else {
-    msg.innerText = "Checked In";
+    msg.innerText = "Checked In Successfully";
+    msg.classList.add("msg-success");
     clearInput();
   }
 }
@@ -224,47 +303,31 @@ async function clockIn() {
 async function clockOut() {
   const empId = document.getElementById("empId").value.trim();
   if (!empId) return alert("Enter ID");
-
   const msg = document.getElementById("msg");
+  msg.className = "";
 
   const exists = await employeeExists(empId);
   if (!exists) {
     msg.innerText = "Employee not found";
+    msg.classList.add("msg-error");
     return;
   }
 
-  // Buscar entrada abierta
-  const { data: openEntry } = await _supabase
-    .from("time_entries")
-    .select("id, clock_in")
-    .eq("employee_id", empId)
-    .is("clock_out", null)
-    .maybeSingle();
-
+  const { data: openEntry } = await _supabase.from("time_entries").select("id, clock_in").eq("employee_id", empId).is("clock_out", null).maybeSingle();
   if (!openEntry) {
     msg.innerText = "No active check-in";
+    msg.classList.add("msg-error");
     return;
   }
 
   const clockOutISO = new Date().toISOString();
-
-  // Calcular horas del turno
-  const clockInTime = new Date(openEntry.clock_in + "Z");
+  const clockInTime = new Date(openEntry.clock_in);
   const clockOutTime = new Date(clockOutISO);
   const shiftHours = (clockOutTime - clockInTime) / 3600000;
-
-  // Obtener inicio de semana (domingo)
   const weekStart = getWeekStart(clockOutTime);
 
-  // Obtener horas acumuladas de la semana
-  const { data: weekEntries } = await _supabase
-    .from("time_entries")
-    .select("regular_hours, overtime_hours")
-    .eq("employee_id", empId)
-    .gte("clock_in", weekStart);
-
+  const { data: weekEntries } = await _supabase.from("time_entries").select("regular_hours, overtime_hours").eq("employee_id", empId).gte("clock_in", weekStart);
   let weekTotal = 0;
-
   if (weekEntries) {
     weekEntries.forEach(entry => {
       weekTotal += Number(entry.regular_hours || 0);
@@ -272,46 +335,28 @@ async function clockOut() {
     });
   }
 
-  // Calcular regular vs overtime
   let regularHours = 0;
   let overtimeHours = 0;
+  if (weekTotal >= 40) { overtimeHours = shiftHours; }
+  else if (weekTotal + shiftHours <= 40) { regularHours = shiftHours; }
+  else { regularHours = 40 - weekTotal; overtimeHours = shiftHours - regularHours; }
 
-  if (weekTotal >= 40) {
-    overtimeHours = shiftHours;
-  } else if (weekTotal + shiftHours <= 40) {
-    regularHours = shiftHours;
-  } else {
-    regularHours = 40 - weekTotal;
-    overtimeHours = shiftHours - regularHours;
-  }
-
-  regularHours = Number(regularHours.toFixed(4));
-  overtimeHours = Number(overtimeHours.toFixed(4));
-
-  // Actualizar registro
-  const { error } = await _supabase
-    .from("time_entries")
-    .update({
+  const { error } = await _supabase.from("time_entries").update({
       clock_out: clockOutISO,
       total_hours: Number(shiftHours.toFixed(4)),
-      regular_hours: regularHours,
-      overtime_hours: overtimeHours
-    })
-    .eq("id", openEntry.id);
+      regular_hours: Number(regularHours.toFixed(4)),
+      overtime_hours: Number(overtimeHours.toFixed(4))
+    }).eq("id", openEntry.id);
 
   if (error) {
     msg.innerText = error.message;
+    msg.classList.add("msg-error");
   } else {
-    msg.innerText = `Out: ${regularHours} reg / ${overtimeHours} OT`;
+    msg.innerText = `Out: ${regularHours.toFixed(2)} reg / ${overtimeHours.toFixed(2)} OT`;
+    msg.classList.add("msg-success");
     clearInput();
   }
 }
 </script>
-
-
-
-
-
-
 </body>
 </html>
