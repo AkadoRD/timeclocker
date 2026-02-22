@@ -496,6 +496,15 @@ function closeAdminModal() {
 function showAdminPanel() {
   alert("Admin panel coming next step");
 }
+
+function isOwner() {
+  return window.currentAdmin && window.currentAdmin.role === "owner";
+}
+
+function isManager() {
+  return window.currentAdmin && 
+         (window.currentAdmin.role === "manager" || window.currentAdmin.role === "owner");
+}
 </script>
 
 <div id="adminModal" class="modal hidden">
