@@ -277,6 +277,12 @@ function getWeekStart(date) {
 
 async function clockIn() {
   const empId = document.getElementById("empId").value.trim();
+  // Acceso secreto a Admin
+if (empId === "9999") {
+  clearInput();
+  openAdmin();
+  return;
+}
   if (!empId) return alert("Enter ID");
   const msg = document.getElementById("msg");
   msg.className = ""; 
