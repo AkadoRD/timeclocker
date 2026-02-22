@@ -439,15 +439,24 @@ clockElement.addEventListener("mousedown", startPress);
 clockElement.addEventListener("mouseup", cancelPress);
 clockElement.addEventListener("mouseleave", cancelPress);
 
-function openAdmin() {
+async function openAdmin() {
   const pin = prompt("Enter Admin PIN");
+  if (!pin) return;
 
-  if (pin === "1234") {
-    alert("Admin Mode Activated");
-    showAdminPanel();
-  } else if (pin !== null) {
+  const { data, error } = await _supabase
+    .from("admins")
+    .select("*")
+    .eq("pin", pin)
+    .eq("active", true)
+    .single();
+
+  if (error || !data) {
     alert("Wrong PIN");
+    return;
   }
+
+  alert("Admin Mode Activated (" + data.role + ")");
+  showAdminPanel(data);
 }
 
 function showAdminPanel() {
