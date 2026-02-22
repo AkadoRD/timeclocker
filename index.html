@@ -407,26 +407,31 @@ window.addEventListener("popstate", function () {
 
 // ===== MODO ADMIN =====
 
-let adminTimer;
-
-// Mantener presionado el reloj
+let pressTimer = null;
 const clockElement = document.getElementById("clock");
 
-clockElement.addEventListener("touchstart", () => {
-  adminTimer = setTimeout(openAdmin, 3000);
-});
+function startPress() {
+  pressTimer = setTimeout(() => {
+    openAdmin();
+  }, 3000);
+}
 
-clockElement.addEventListener("touchend", () => {
-  clearTimeout(adminTimer);
-});
+function cancelPress() {
+  if (pressTimer !== null) {
+    clearTimeout(pressTimer);
+    pressTimer = null;
+  }
+}
 
-clockElement.addEventListener("mousedown", () => {
-  adminTimer = setTimeout(openAdmin, 3000);
-});
+// Eventos táctiles (Android / Tablet)
+clockElement.addEventListener("touchstart", startPress);
+clockElement.addEventListener("touchend", cancelPress);
+clockElement.addEventListener("touchcancel", cancelPress);
 
-clockElement.addEventListener("mouseup", () => {
-  clearTimeout(adminTimer);
-});
+// Eventos mouse (PC)
+clockElement.addEventListener("mousedown", startPress);
+clockElement.addEventListener("mouseup", cancelPress);
+clockElement.addEventListener("mouseleave", cancelPress);
 
 function openAdmin() {
   const pin = prompt("Enter Admin PIN");
