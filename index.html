@@ -488,7 +488,8 @@ async function validateAdmin() {
 
   closeAdminModal();
   alert("Admin Mode Activated (" + data.role + ")");
-  showAdminPanel(data);
+  window.currentAdmin = data;
+showAdminPanel(data);
 }
 
 function closeAdminModal() {
