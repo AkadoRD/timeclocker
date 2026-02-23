@@ -469,8 +469,19 @@ clockElement.addEventListener("mousedown", startPress);
 clockElement.addEventListener("mouseup", cancelPress);
 clockElement.addEventListener("mouseleave", cancelPress);
 
-async function openAdmin() {
-  const pin = prompt("Enter Admin PIN");
+function openAdmin() {
+  document.getElementById("adminModal").classList.remove("hidden");
+  document.getElementById("adminPinInput").value = "";
+  document.getElementById("adminPinInput").focus();
+}
+
+function closeAdminModal() {
+  document.getElementById("adminModal").classList.add("hidden");
+  document.getElementById("adminPinInput").value = "";
+}
+
+async function validateAdmin() {
+  const pin = document.getElementById("adminPinInput").value.trim();
   if (!pin) return;
 
   const { data, error } = await _supabase
@@ -480,23 +491,16 @@ async function openAdmin() {
     .eq("active", true)
     .single();
 
-  console.log("ADMIN QUERY RESULT:", data, error); // ← agregar esto
-
   if (error || !data) {
     alert("Wrong PIN");
     return;
   }
 
   window.currentAdmin = data;
-  console.log("GLOBAL ADMIN SET:", window.currentAdmin); // ← agregar esto
+  closeAdminModal();
 
   alert("Admin Mode Activated (" + data.role + ")");
   showAdminPanel(data);
-}
-
-function closeAdminModal() {
-  document.getElementById("adminModal").classList.add("hidden");
-  document.getElementById("adminPinInput").value = "";
 }
 
 function showAdminPanel(admin) {
