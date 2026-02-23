@@ -238,6 +238,12 @@ syncOfflineEntries();
       <div id="clock"></div>
     </div>
 
+    <div id="adminPanel" style="display:none;">
+  <h2>Admin Panel</h2>
+  <p id="adminInfo"></p>
+  <button onclick="closeAdmin()">Exit Admin</button>
+ </div>
+
     <div class="input-group">
       <label>Employee ID</label>
       <input id="empId" type="number" placeholder="0000" min="0" max="9999" step="1" inputmode="numeric"
@@ -528,11 +534,6 @@ function isManager() {
     <button onclick="validateAdmin()">Enter</button>
     <button onclick="closeAdminModal()">Cancel</button>
   </div>
-  <div id="adminPanel" class="hidden">
-  <h2>Admin Dashboard</h2>
-  <p id="adminInfo"></p>
-  <button onclick="closeAdminPanel()">Exit Admin</button>
-</div>
-</div>
+ </div>
 </body>
 </html>
