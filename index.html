@@ -374,7 +374,7 @@ async function clockOut() {
   }
 
   const clockOutISO = new Date().toISOString();
-  const clockInTime = new Date(openEntry.clock_in);
+  const clockInTime = new Date(openEntry.clock_in + "Z");
   const clockOutTime = new Date(clockOutISO);
   const shiftHours = (clockOutTime - clockInTime) / 3600000;
   function getWeekStart(date) {
