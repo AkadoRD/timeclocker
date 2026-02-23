@@ -384,6 +384,10 @@ async function clockOut() {
   const clockInTime = new Date(openEntry.clock_in);
   const clockOutTime = new Date(clockOutISO);
   const shiftHours = (clockOutTime - clockInTime) / 3600000;
+  console.log("clockInTime:", clockInTime);
+console.log("clockOutTime:", clockOutTime);
+console.log("shiftHours:", shiftHours);
+console.log("weekStart:", weekStart);
 console.log("weekTotal:", weekTotal, "shiftHours:", shiftHours); // depuración aquí
 const weekStart = getWeekStart(clockOutTime);
 
@@ -393,6 +397,8 @@ const weekStart = getWeekStart(clockOutTime);
     .eq("employee_id", empId)
     .gte("clock_in", weekStart);
 
+    console.log("weekEntries:", weekEntries);
+    
   let weekTotal = 0;
 if (weekEntries) {
   weekEntries.forEach(entry => {
