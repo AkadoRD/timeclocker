@@ -367,7 +367,13 @@ async function clockOut() {
     return;
   }
 
-  const { data: openEntry } = await _supabase.from("time_entries").select("id, clock_in").eq("employee_id", empId).is("clock_out", null).maybeSingle();
+  const { data: openEntry } = await _supabase
+    .from("time_entries")
+    .select("id, clock_in")
+    .eq("employee_id", empId)
+    .is("clock_out", null)
+    .maybeSingle();
+
   if (!openEntry) {
     msg.innerText = "No active check-in";
     msg.classList.add("msg-error");
@@ -380,7 +386,12 @@ async function clockOut() {
   const shiftHours = (clockOutTime - clockInTime) / 3600000;
   const weekStart = getWeekStart(clockOutTime);
 
-  const { data: weekEntries } = await _supabase.from("time_entries").select("regular_hours, overtime_hours").eq("employee_id", empId).gte("clock_in", weekStart);
+  const { data: weekEntries } = await _supabase
+    .from("time_entries")
+    .select("regular_hours, overtime_hours")
+    .eq("employee_id", empId)
+    .gte("clock_in", weekStart);
+
   let weekTotal = 0;
   if (weekEntries) {
     weekEntries.forEach(entry => {
@@ -391,16 +402,45 @@ async function clockOut() {
 
   let regularHours = 0;
   let overtimeHours = 0;
-  if (weekTotal >= 40) { overtimeHours = shiftHours; }
-  else if (weekTotal + shiftHours <= 40) { regularHours = shiftHours; }
-  else { regularHours = 40 - weekTotal; overtimeHours = shiftHours - regularHours; }
+  if (weekTotal >= 40) {
+    overtimeHours = shiftHours;
+  } else if (weekTotal + shiftHours <= 40) {
+    regularHours = shiftHours;
+  } else {
+    regularHours = 40 - weekTotal;
+    overtimeHours = shiftHours - regularHours;
+  }
 
-  const { error } = await _supabase.from("time_entries").update({
+  // --- Cálculo de pagos ---
+  const { data: employee } = await _supabase
+    .from("employees")
+    .select("hourly_rate, overtime_multiplier, tax_percent")
+    .eq("employee_id", empId)
+    .single();
+
+  const round = (num) => Math.round(num * 100) / 100;
+
+  const regularPay = round(regularHours * employee.hourly_rate);
+  const overtimePay = round(overtimeHours * employee.hourly_rate * employee.overtime_multiplier);
+  const grossPay = round(regularPay + overtimePay);
+  const taxes = round(grossPay * (employee.tax_percent / 100));
+  const netPay = round(grossPay - taxes);
+
+  // --- Guardar todo en un solo update ---
+  const { error } = await _supabase
+    .from("time_entries")
+    .update({
       clock_out: clockOutISO,
       total_hours: Number(shiftHours.toFixed(4)),
       regular_hours: Number(regularHours.toFixed(4)),
-      overtime_hours: Number(overtimeHours.toFixed(4))
-    }).eq("id", openEntry.id);
+      overtime_hours: Number(overtimeHours.toFixed(4)),
+      regular_pay: regularPay,
+      overtime_pay: overtimePay,
+      gross_pay: grossPay,
+      taxes: taxes,
+      net_pay: netPay
+    })
+    .eq("id", openEntry.id);
 
   if (error) {
     msg.innerText = error.message;
