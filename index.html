@@ -493,8 +493,22 @@ function closeAdminModal() {
   document.getElementById("adminPinInput").value = "";
 }
 
-function showAdminPanel() {
-  alert("Admin panel coming next step");
+function showAdminPanel(admin) {
+  // Ocultar pantalla principal
+  document.getElementById("mainApp").style.display = "none";
+
+  // Mostrar panel admin
+  const panel = document.getElementById("adminPanel");
+  panel.classList.remove("hidden");
+
+  // Mostrar info del admin
+  document.getElementById("adminInfo").innerText =
+    "Welcome " + admin.name + " (" + admin.role + ")";
+}
+
+function closeAdminPanel() {
+  document.getElementById("adminPanel").classList.add("hidden");
+  document.getElementById("mainApp").style.display = "block";
 }
 
 function isOwner() {
@@ -514,6 +528,11 @@ function isManager() {
     <button onclick="validateAdmin()">Enter</button>
     <button onclick="closeAdminModal()">Cancel</button>
   </div>
+  <div id="adminPanel" class="hidden">
+  <h2>Admin Dashboard</h2>
+  <p id="adminInfo"></p>
+  <button onclick="closeAdminPanel()">Exit Admin</button>
+</div>
 </div>
 </body>
 </html>
