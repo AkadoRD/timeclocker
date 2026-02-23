@@ -296,14 +296,7 @@ async function employeeExists(empId) {
 
   return !!data;
 }
-function getWeekStart(date) {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day;
-  const weekStart = new Date(d.setDate(diff));
-  weekStart.setHours(0,0,0,0);
-  return weekStart.toISOString();
-}
+
 
 async function clockIn() {
   const empId = document.getElementById("empId").value.trim();
@@ -384,11 +377,17 @@ async function clockOut() {
   const clockInTime = new Date(openEntry.clock_in);
   const clockOutTime = new Date(clockOutISO);
   const shiftHours = (clockOutTime - clockInTime) / 3600000;
+  function getWeekStart(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day;
+  const weekStart = new Date(d.setDate(diff));
+  weekStart.setHours(0,0,0,0);
+  return weekStart.toISOString();
+}
   console.log("clockInTime:", clockInTime);
 console.log("clockOutTime:", clockOutTime);
 console.log("shiftHours:", shiftHours);
-console.log("weekStart:", weekStart);
-console.log("weekTotal:", weekTotal, "shiftHours:", shiftHours); // depuración aquí
 const weekStart = getWeekStart(clockOutTime);
 
   const { data: weekEntries } = await _supabase
@@ -399,6 +398,7 @@ const weekStart = getWeekStart(clockOutTime);
 
     console.log("weekEntries:", weekEntries);
     
+
   let weekTotal = 0;
 if (weekEntries) {
   weekEntries.forEach(entry => {
@@ -419,7 +419,24 @@ if (weekEntries) {
     regularHours = 40 - weekTotal;
     overtimeHours = shiftHours - regularHours;
   }
+const { error } = await _supabase
+  .from("time_entries")
+  .update({
+    clock_out: clockOutISO,
+    regular_hours: regularHours,
+    overtime_hours: overtimeHours,
+    total_hours: shiftHours
+  })
+  .eq("id", openEntry.id);
 
+if (error) {
+  msg.innerText = error.message;
+  msg.classList.add("msg-error");
+} else {
+  msg.innerText = "Checked Out Successfully";
+  msg.classList.add("msg-success");
+  clearInput();
+}
   // --- Cálculo de pagos ---
   const { data: employee } = await _supabase
     .from("employees")
