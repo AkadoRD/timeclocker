@@ -384,7 +384,8 @@ async function clockOut() {
   const clockInTime = new Date(openEntry.clock_in);
   const clockOutTime = new Date(clockOutISO);
   const shiftHours = (clockOutTime - clockInTime) / 3600000;
-  const weekStart = getWeekStart(clockOutTime);
+console.log("weekTotal:", weekTotal, "shiftHours:", shiftHours); // depuración aquí
+const weekStart = getWeekStart(clockOutTime);
 
   const { data: weekEntries } = await _supabase
     .from("time_entries")
@@ -393,12 +394,14 @@ async function clockOut() {
     .gte("clock_in", weekStart);
 
   let weekTotal = 0;
-  if (weekEntries) {
-    weekEntries.forEach(entry => {
+if (weekEntries) {
+  weekEntries.forEach(entry => {
+    if (entry.clock_out) { // solo sumamos los que ya cerraron
       weekTotal += Number(entry.regular_hours || 0);
       weekTotal += Number(entry.overtime_hours || 0);
-    });
-  }
+    }
+  });
+}
 
   let regularHours = 0;
   let overtimeHours = 0;
