@@ -324,9 +324,14 @@ if (empId === "9999") {
     return;
   }
 
-  const entry = {
+  const now = new Date();
+
+const entry = {
   employee_id: empId,
-  clock_in: new Date().toISOString()
+  clock_in: now.toISOString(),
+  clock_in_local: now.toLocaleString("en-US", {
+    timeZone: "America/New_York"
+  })
 };
 
 if (!isOnline()) {
@@ -373,7 +378,11 @@ async function clockOut() {
     return;
   }
 
-  const clockOutISO = new Date().toISOString();
+ const now = new Date();
+const clockOutISO = now.toISOString();
+const clockOutLocal = now.toLocaleString("en-US", {
+  timeZone: "America/New_York"
+});
   const clockInTime = new Date(openEntry.clock_in + "Z");
   const clockOutTime = new Date(clockOutISO);
   const shiftHours = (clockOutTime - clockInTime) / 3600000;
@@ -440,6 +449,7 @@ if (weekEntries) {
     .from("time_entries")
     .update({
       clock_out: clockOutISO,
+      clock_out_local: clockOutLocal,
       total_hours: Number(shiftHours.toFixed(4)),
       regular_hours: Number(regularHours.toFixed(4)),
       overtime_hours: Number(overtimeHours.toFixed(4)),
