@@ -445,21 +445,25 @@ if (weekEntries) {
   const netPay = round(grossPay - taxes);
 
   // --- Guardar todo en un solo update ---
-  const { error } = await _supabase
-    .from("time_entries")
-    .update({
-      clock_out: clockOutISO,
-      clock_out_local: clockOutLocal,
-      total_hours: Number(shiftHours.toFixed(4)),
-      regular_hours: Number(regularHours.toFixed(4)),
-      overtime_hours: Number(overtimeHours.toFixed(4)),
-      regular_pay: regularPay,
-      overtime_pay: overtimePay,
-      gross_pay: grossPay,
-      taxes: taxes,
-      net_pay: netPay
-    })
-    .eq("id", openEntry.id);
+  const clockOutLocal = new Date().toLocaleString("en-US", {
+  timeZone: "America/New_York"
+});
+
+const { error } = await _supabase
+  .from("time_entries")
+  .update({
+    clock_out: clockOutISO,
+    clock_out_local: clockOutLocal,
+    total_hours: Number(shiftHours.toFixed(4)),
+    regular_hours: Number(regularHours.toFixed(4)),
+    overtime_hours: Number(overtimeHours.toFixed(4)),
+    regular_pay: regularPay,
+    overtime_pay: overtimePay,
+    gross_pay: grossPay,
+    taxes: taxes,
+    net_pay: netPay
+  })
+  .eq("id", openEntry.id);
 
   if (error) {
     msg.innerText = error.message;
