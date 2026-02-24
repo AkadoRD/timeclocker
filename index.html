@@ -392,7 +392,7 @@ const weekStart = getWeekStart(clockOutTime);
 
   const { data: weekEntries } = await _supabase
     .from("time_entries")
-    .select("regular_hours, overtime_hours")
+    .select("regular_hours, overtime_hours, clock_out")
     .eq("employee_id", empId)
     .gte("clock_in", weekStart);
 
@@ -419,24 +419,7 @@ if (weekEntries) {
     regularHours = 40 - weekTotal;
     overtimeHours = shiftHours - regularHours;
   }
-const { error } = await _supabase
-  .from("time_entries")
-  .update({
-    clock_out: clockOutISO,
-    regular_hours: regularHours,
-    overtime_hours: overtimeHours,
-    total_hours: shiftHours
-  })
-  .eq("id", openEntry.id);
 
-if (error) {
-  msg.innerText = error.message;
-  msg.classList.add("msg-error");
-} else {
-  msg.innerText = "Checked Out Successfully";
-  msg.classList.add("msg-success");
-  clearInput();
-}
   // --- Cálculo de pagos ---
   const { data: employee } = await _supabase
     .from("employees")
