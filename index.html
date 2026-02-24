@@ -593,6 +593,14 @@ function isManager() {
   return window.currentAdmin && 
          (window.currentAdmin.role === "manager" || window.currentAdmin.role === "owner");
 }
+
+function openAdminPanel() {
+  document.getElementById("adminPanel").classList.remove("hidden");
+}
+
+function closeAdminPanel() {
+  document.getElementById("adminPanel").classList.add("hidden");
+}
 </script>
 
 <div id="adminModal" class="modal hidden">
@@ -603,5 +611,24 @@ function isManager() {
     <button onclick="closeAdminModal()">Cancel</button>
   </div>
  </div>
+ <!-- ADMIN PANEL -->
+<div id="adminPanel" class="hidden" style="
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: white;
+  z-index: 9999;
+  overflow: auto;
+  padding: 20px;
+">
+  <h2>Admin Panel</h2>
+  <div id="adminContent">
+    <p>Loading...</p>
+  </div>
+  <button onclick="closeAdminPanel()">Close</button>
+
+</div>
 </body>
 </html>
