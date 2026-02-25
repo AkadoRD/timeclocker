@@ -161,6 +161,7 @@
 
     .msg-success { background: var(--success-soft); color: var(--success-text); }
     .msg-error { background: var(--error-soft); color: var(--error-text); }
+    
 
     input[type=number]::-webkit-outer-spin-button,
     input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
@@ -304,6 +305,11 @@ async function clockIn() {
     msg.classList.add("msg-error");
     return;
   }
+  else {
+  msg.innerText = "Checked In Successfully";
+  msg.classList.add("msg-success");
+  playSound("success");     // ← AGREGAR ESTA LÍNEA
+  clearInput();
 
   const { data: openEntry } = await _supabase.from("time_entries").select("id").eq("employee_id", empId).is("clock_out", null).maybeSingle();
   if (openEntry) {
@@ -340,6 +346,8 @@ async function clockIn() {
   }
 }
 
+
+
 async function clockOut() {
   const empId = document.getElementById("empId").value.trim();
   if (!empId) return alert("Enter ID");
@@ -353,6 +361,12 @@ async function clockOut() {
     return;
   }
 
+  else {
+  msg.innerText = `Out: ${regularHours.toFixed(2)} reg / ${overtimeHours.toFixed(2)} OT`;
+  msg.classList.add("msg-success");
+  playSound("success");     // ← AGREGAR ESTA LÍNEA
+  clearInput();
+}
   const { data: openEntry } = await _supabase
     .from("time_entries")
     .select("id, clock_in")
@@ -576,6 +590,38 @@ function closeAdminPanel() {
   document.getElementById("adminPanel").classList.add("hidden");
   document.getElementById("mainCard").style.display = "block";
 }
+
+// ================== SONIDOS DE CONFIRMACIÓN ==================
+function playSound(type) {
+  try {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+
+    oscillator.connect(gain);
+    gain.connect(audioContext.destination);
+
+    if (type === "success") {
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(900, audioContext.currentTime);
+      gain.gain.value = 0.3;
+      oscillator.start();
+      setTimeout(() => {
+        oscillator.frequency.setValueAtTime(1200, audioContext.currentTime);
+      }, 80);
+      setTimeout(() => oscillator.stop(), 280);
+    } else if (type === "error") {
+      oscillator.type = "sawtooth";
+      oscillator.frequency.setValueAtTime(180, audioContext.currentTime);
+      gain.gain.value = 0.4;
+      oscillator.start();
+      setTimeout(() => oscillator.stop(), 220);
+    }
+  } catch (e) {
+    console.log("Sonido no disponible");
+  }
+}
+
 </script>
 
 <div id="adminModal" class="modal hidden">
