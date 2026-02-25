@@ -1,132 +1,208 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<meta name="theme-color" content="#ffffff">
-<title>Employee Clock</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#ffffff">
+  <title>Employee Clock</title>
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <script>
+    function isOnline() { return navigator.onLine; }
 
-<style>
-body {
-  margin:0;
-  font-family: Arial, sans-serif;
-  background:#f4f6f8;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  min-height:100vh;
-}
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js")
+          .then(() => console.log("SW registrado"))
+          .catch(err => console.log("Error SW:", err));
+      });
+    }
 
-#mainCard {
-  background:white;
-  padding:30px;
-  width:90%;
-  max-width:450px;
-  border-radius:20px;
-  box-shadow:0 10px 30px rgba(0,0,0,0.08);
-  text-align:center;
-}
+    function saveOfflineEntry(entry) {
+      let pending = JSON.parse(localStorage.getItem("pendingEntries")) || [];
+      pending.push(entry);
+      localStorage.setItem("pendingEntries", JSON.stringify(pending));
+    }
 
-#clock {
-  font-size:40px;
-  font-weight:bold;
-  color:#2cb3ba;
-}
+    async function syncOfflineEntries() {
+      let pending = JSON.parse(localStorage.getItem("pendingEntries")) || [];
+      if (pending.length === 0) return;
+      let remaining = [];
+      for (let entry of pending) {
+        const { error } = await _supabase.from("time_entries").insert([entry]);
+        if (error) remaining.push(entry);
+      }
+      if (remaining.length > 0) {
+        localStorage.setItem("pendingEntries", JSON.stringify(remaining));
+      } else {
+        localStorage.removeItem("pendingEntries");
+      }
+    }
 
-input {
-  width:100%;
-  padding:15px;
-  font-size:22px;
-  margin-top:15px;
-  text-align:center;
-}
+    window.addEventListener("online", () => {
+      console.log("Internet restaurado. Sincronizando...");
+      syncOfflineEntries();
+    });
+    syncOfflineEntries();
+  </script>
 
-button {
-  width:48%;
-  padding:15px;
-  margin-top:15px;
-  font-size:16px;
-  cursor:pointer;
-}
+  <style>
+    :root {
+      --bg-color: #f8f9fa;
+      --card-bg: #ffffff;
+      --primary: #2cb3ba;
+      --text-main: #2f3640;
+      --text-muted: #7f8c8d;
+      --border: #dcdde1;
+      --success-soft: #ebfbee;
+      --success-text: #21b9bc;
+      --error-soft: #fff5f5;
+      --error-text: #cc8a27;
+    }
 
-.button-group {
-  display:flex;
-  justify-content:space-between;
-}
+    body {
+      margin: 0;
+      font-family: 'Inter', -apple-system, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+      user-select: none;
+      touch-action: manipulation;
+    }
 
-#msg {
-  margin-top:20px;
-  min-height:30px;
-  font-weight:bold;
-}
+    #mainCard {
+      background: var(--card-bg);
+      width: 90%;
+      max-width: 450px;
+      padding: 3rem 2rem;
+      border-radius: 24px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.05);
+      text-align: center;
+    }
 
-.hidden { display:none; }
+    #clockContainer { margin-bottom: 2.5rem; }
 
-.modal {
-  position:fixed;
-  top:0;
-  left:0;
-  width:100%;
-  height:100%;
-  background:rgba(0,0,0,0.6);
-  display:flex;
-  justify-content:center;
-  align-items:center;
-}
+    #date {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+    }
 
-.modal-content {
-  background:white;
-  padding:20px;
-  border-radius:10px;
-  text-align:center;
-}
+    #clock {
+      font-size: 3.5rem;
+      font-weight: 700;
+      color: var(--primary);
+      font-variant-numeric: tabular-nums;
+    }
 
-#adminPanel {
-  position:fixed;
-  top:0;
-  left:0;
-  width:100%;
-  height:100%;
-  background:white;
-  z-index:9999;
-  padding:20px;
-}
-</style>
+    .input-group { margin-bottom: 2rem; }
+
+    label {
+      display: block;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 0.8rem;
+    }
+
+    input#empId {
+      width: 100%;
+      padding: 1rem;
+      font-size: 2rem;
+      border: 2px solid var(--border);
+      border-radius: 16px;
+      text-align: center;
+      background: #fdfdfd;
+      transition: all 0.2s;
+      box-sizing: border-box;
+      outline: none;
+    }
+
+    input#empId:focus {
+      border-color: var(--primary);
+      background: #fff;
+      box-shadow: 0 0 0 4px rgba(74, 105, 189, 0.1);
+    }
+
+    .button-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    button {
+      padding: 1.2rem;
+      font-size: 1.1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    button[onclick="clockIn()"] { background-color: #eb8e55; color: white; border: 1px solid var(--border); }
+    button[onclick="clockOut()"] { background-color: var(--primary); color: white; }
+
+    #msg {
+      margin-top: 2rem;
+      font-size: 1rem;
+      min-height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 12px;
+      font-weight: 500;
+    }
+
+    .msg-success { background: var(--success-soft); color: var(--success-text); }
+    .msg-error { background: var(--error-soft); color: var(--error-text); }
+
+    .modal {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6);
+      display: flex; justify-content: center; align-items: center;
+      z-index: 10000;
+    }
+
+    .modal-content { background: white; padding: 20px; border-radius: 8px; text-align: center; }
+    .hidden { display: none !important; }
+
+    input[type=number]::-webkit-outer-spin-button,
+    input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  </style>
 </head>
 <body>
 
-<div id="mainCard">
-  <div id="clock"></div>
+  <div id="mainCard">
+    <div id="clockContainer">
+      <div id="date"></div>
+      <div id="clock"></div>
+    </div>
 
-  <input id="empId" type="number" placeholder="Employee ID">
+    <div class="input-group">
+      <label>Employee ID</label>
+      <input id="empId" type="number" placeholder="0000" min="0" max="9999" step="1" inputmode="numeric"
+      pattern="[0-9]*" oninput="if(this.value.length > 4) this.value = this.value.slice(0,4);">
+    </div>
 
-  <div class="button-group">
-    <button onclick="clockIn()">Clock In</button>
-    <button onclick="clockOut()">Clock Out</button>
+    <div class="button-group">
+      <button onclick="clockIn()">Clock In</button>
+      <button onclick="clockOut()">Clock Out</button>
+    </div>
+
+    <p id="msg"></p>
   </div>
-
-  <div id="msg"></div>
-</div>
-
-<!-- ADMIN PIN MODAL -->
-<div id="adminModal" class="modal hidden">
-  <div class="modal-content">
-    <h3>Enter Admin PIN</h3>
-    <input type="password" id="adminPinInput">
-    <br><br>
-    <button onclick="validateAdmin()">Enter</button>
-    <button onclick="closeAdminModal()">Cancel</button>
-  </div>
-</div>
-
-<!-- ADMIN PANEL -->
-<div id="adminPanel" class="hidden">
-  <h2>Admin Panel</h2>
-  <p id="adminInfo"></p>
-  <button onclick="closeAdminPanel()">Close</button>
-</div>
 
 <script>
 const _supabase = supabase.createClient(
@@ -134,108 +210,236 @@ const _supabase = supabase.createClient(
   "sb_publishable_ZwLCHMtM9uCfBFkwBcSSEQ_zQVq1RwI"
 );
 
-function updateClock(){
-  document.getElementById("clock").innerText =
-    new Date().toLocaleTimeString("en-US",{hour12:true});
+function updateClock() {
+  const now = new Date();
+  const timeOptions = { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true };
+  const dateOptions = { timeZone: "America/New_York", weekday: "long", year: "numeric", month: "long", day: "numeric" };
+  document.getElementById("clock").innerText = now.toLocaleTimeString("en-US", timeOptions);
+  document.getElementById("date").innerText = now.toLocaleDateString("en-US", dateOptions);
 }
-setInterval(updateClock,1000);
+setInterval(updateClock, 1000);
 updateClock();
 
-function clearInput(){
-  document.getElementById("empId").value="";
+function clearInput() { document.getElementById("empId").value = ""; }
+
+async function employeeExists(empId) {
+  if (!navigator.onLine) return true;
+  const { data, error } = await _supabase.from("employees").select("employee_id").eq("employee_id", empId).single();
+  return !error && !!data;
 }
 
-async function clockIn(){
-  const empId=document.getElementById("empId").value.trim();
-  if(empId==="9999"){
-    openAdmin();
-    clearInput();
-    return;
-  }
-  if(!empId) return alert("Enter ID");
+async function clockIn() {
+  const empId = document.getElementById("empId").value.trim();
+  if (empId === "9999") { clearInput(); openAdmin(); return; }
+  if (!empId) return alert("Enter ID");
+  
+  const msg = document.getElementById("msg");
+  msg.className = ""; 
 
-  const { error } = await _supabase.from("time_entries").insert([{
-    employee_id:empId,
-    clock_in:new Date().toISOString()
-  }]);
-
-  const msg=document.getElementById("msg");
-  if(error){
-    msg.innerText=error.message;
-  }else{
-    msg.innerText="Checked In Successfully";
-    clearInput();
-  }
-}
-
-async function clockOut(){
-  const empId=document.getElementById("empId").value.trim();
-  if(!empId) return alert("Enter ID");
-
-  const { data:openEntry } = await _supabase
-    .from("time_entries")
-    .select("id")
-    .eq("employee_id",empId)
-    .is("clock_out",null)
-    .maybeSingle();
-
-  if(!openEntry){
-    document.getElementById("msg").innerText="No active check-in";
+  const exists = await employeeExists(empId);
+  if (!exists) {
+    msg.innerText = "Employee not found";
+    msg.classList.add("msg-error");
     return;
   }
 
-  await _supabase
-    .from("time_entries")
-    .update({ clock_out:new Date().toISOString() })
-    .eq("id",openEntry.id);
+  const { data: openEntry } = await _supabase.from("time_entries").select("id").eq("employee_id", empId).is("clock_out", null).maybeSingle();
+  if (openEntry) {
+    msg.innerText = "Already checked in";
+    msg.classList.add("msg-error");
+    return;
+  }
 
-  document.getElementById("msg").innerText="Checked Out Successfully";
-  clearInput();
+  const now = new Date();
+  const entry = {
+    employee_id: empId,
+    clock_in: now.toISOString(),
+    clock_in_local: now.toLocaleString("en-US", { timeZone: "America/New_York" })
+  };
+
+  if (!isOnline()) {
+    saveOfflineEntry(entry);
+    msg.innerText = "Saved offline";
+    clearInput();
+    return;
+  }
+
+  const { error } = await _supabase.from("time_entries").insert([entry]);
+  if (error) {
+    msg.innerText = error.message;
+    msg.classList.add("msg-error");
+  } else {
+    msg.innerText = "Checked In Successfully";
+    msg.classList.add("msg-success");
+    clearInput();
+  }
 }
 
-/* ===== ADMIN SYSTEM ===== */
+async function clockOut() {
+  const empId = document.getElementById("empId").value.trim();
+  if (!empId) return alert("Enter ID");
+  const msg = document.getElementById("msg");
+  msg.className = "";
 
-function openAdmin(){
+  const exists = await employeeExists(empId);
+  if (!exists) {
+    msg.innerText = "Employee not found";
+    msg.classList.add("msg-error");
+    return;
+  }
+
+  const { data: openEntry } = await _supabase.from("time_entries").select("id, clock_in").eq("employee_id", empId).is("clock_out", null).maybeSingle();
+
+  if (!openEntry) {
+    msg.innerText = "No active check-in";
+    msg.classList.add("msg-error");
+    return;
+  }
+
+  const now = new Date();
+  const clockOutISO = now.toISOString();
+  const clockOutLocalStr = now.toLocaleString("en-US", { timeZone: "America/New_York" });
+  
+  const clockInTime = new Date(openEntry.clock_in);
+  const shiftHours = (now - clockInTime) / 3600000;
+
+  function getWeekStart(date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day;
+    const weekStart = new Date(d.setDate(diff));
+    weekStart.setHours(0,0,0,0);
+    return weekStart.toISOString();
+  }
+
+  const weekStart = getWeekStart(now);
+  const { data: weekEntries } = await _supabase.from("time_entries").select("regular_hours, overtime_hours, clock_out").eq("employee_id", empId).gte("clock_in", weekStart);
+
+  let weekTotal = 0;
+  if (weekEntries) {
+    weekEntries.forEach(e => {
+      if (e.clock_out) {
+        weekTotal += Number(e.regular_hours || 0);
+        weekTotal += Number(e.overtime_hours || 0);
+      }
+    });
+  }
+
+  let regularHours = 0;
+  let overtimeHours = 0;
+  if (weekTotal >= 40) {
+    overtimeHours = shiftHours;
+  } else if (weekTotal + shiftHours <= 40) {
+    regularHours = shiftHours;
+  } else {
+    regularHours = 40 - weekTotal;
+    overtimeHours = shiftHours - regularHours;
+  }
+
+  const { data: employee } = await _supabase.from("employees").select("hourly_rate, overtime_multiplier, tax_percent").eq("employee_id", empId).single();
+
+  const round = (num) => Math.round(num * 100) / 100;
+  const regularPay = round(regularHours * employee.hourly_rate);
+  const overtimePay = round(overtimeHours * employee.hourly_rate * employee.overtime_multiplier);
+  const grossPay = round(regularPay + overtimePay);
+  const taxes = round(grossPay * (employee.tax_percent / 100));
+  const netPay = round(grossPay - taxes);
+
+  const { error } = await _supabase.from("time_entries").update({
+    clock_out: clockOutISO,
+    clock_out_local: clockOutLocalStr,
+    total_hours: Number(shiftHours.toFixed(4)),
+    regular_hours: Number(regularHours.toFixed(4)),
+    overtime_hours: Number(overtimeHours.toFixed(4)),
+    regular_pay: regularPay,
+    overtime_pay: overtimePay,
+    gross_pay: grossPay,
+    taxes: taxes,
+    net_pay: netPay
+  }).eq("id", openEntry.id);
+
+  if (error) {
+    msg.innerText = error.message;
+    msg.classList.add("msg-error");
+  } else {
+    msg.innerText = `Out: ${regularHours.toFixed(2)} reg / ${overtimeHours.toFixed(2)} OT`;
+    msg.classList.add("msg-success");
+    clearInput();
+  }
+}
+
+let wakeLock = null;
+async function keepScreenOn() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+    }
+  } catch (err) { console.log("Wake lock error:", err); }
+}
+window.addEventListener('load', keepScreenOn);
+document.addEventListener('visibilitychange', () => {
+  if (wakeLock !== null && document.visibilityState === 'visible') keepScreenOn();
+});
+
+// ADMIN LOGIC
+let pressTimer = null;
+const clockElement = document.getElementById("clock");
+
+function startPress() { pressTimer = setTimeout(openAdmin, 3000); }
+function cancelPress() { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } }
+
+clockElement.addEventListener("touchstart", startPress);
+clockElement.addEventListener("touchend", cancelPress);
+clockElement.addEventListener("mousedown", startPress);
+clockElement.addEventListener("mouseup", cancelPress);
+
+function openAdmin() {
   document.getElementById("adminModal").classList.remove("hidden");
   document.getElementById("adminPinInput").focus();
 }
 
-function closeAdminModal(){
+function closeAdminModal() {
   document.getElementById("adminModal").classList.add("hidden");
+  document.getElementById("adminPinInput").value = "";
 }
 
-async function validateAdmin(){
-  const pin=document.getElementById("adminPinInput").value.trim();
-  if(!pin) return;
+async function validateAdmin() {
+  const pin = document.getElementById("adminPinInput").value.trim();
+  const { data, error } = await _supabase.from("admins").select("*").eq("pin", pin).eq("active", true).single();
 
-  const { data } = await _supabase
-    .from("admins")
-    .select("*")
-    .eq("pin",pin)
-    .eq("active",true)
-    .single();
-
-  if(!data){
-    alert("Wrong PIN");
-    return;
-  }
-
+  if (error || !data) { alert("Wrong PIN"); return; }
+  window.currentAdmin = data;
   closeAdminModal();
   showAdminPanel(data);
 }
 
-function showAdminPanel(admin){
-  document.getElementById("mainCard").style.display="none";
-  document.getElementById("adminPanel").classList.remove("hidden");
-  document.getElementById("adminInfo").innerText=
-    "Welcome "+admin.name+" ("+admin.role+")";
+function showAdminPanel(admin) {
+  document.getElementById("mainCard").style.display = "none";
+  const panel = document.getElementById("adminPanel");
+  panel.classList.remove("hidden");
+  document.getElementById("adminContent").innerHTML = `<p>Welcome ${admin.name} (${admin.role})</p>`;
 }
 
-function closeAdminPanel(){
+function closeAdminPanel() {
   document.getElementById("adminPanel").classList.add("hidden");
-  document.getElementById("mainCard").style.display="block";
+  document.getElementById("mainCard").style.display = "block";
 }
 </script>
+
+<div id="adminModal" class="modal hidden">
+  <div class="modal-content">
+    <h3>Enter Admin PIN</h3>
+    <input type="password" id="adminPinInput" placeholder="PIN" />
+    <button onclick="validateAdmin()">Enter</button>
+    <button onclick="closeAdminModal()">Cancel</button>
+  </div>
+</div>
+
+<div id="adminPanel" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 9999; overflow: auto; padding: 20px;">
+  <h2>Admin Panel</h2>
+  <div id="adminContent"></div>
+  <button onclick="closeAdminPanel()">Close</button>
+</div>
 
 </body>
 </html>
