@@ -1,634 +1,241 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <meta name="theme-color" content="#ffffff">
-  <title>Employee Clock</title>
-  <link rel="manifest" href="./manifest.json">
-  <link rel="icon" type="image/png" href="icons/icon-192.png">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#ffffff">
+<title>Employee Clock</title>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  
-  <script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    function isOnline() {
-  return navigator.onLine;
-}
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./sw.js")
-          .then(() => console.log("SW registrado"))
-          .catch(err => console.log("Error SW:", err));
-      });
-    }
-    function saveOfflineEntry(entry) {
-  let pending = JSON.parse(localStorage.getItem("pendingEntries")) || [];
-  pending.push(entry);
-  localStorage.setItem("pendingEntries", JSON.stringify(pending));
+<style>
+body {
+  margin:0;
+  font-family: Arial, sans-serif;
+  background:#f4f6f8;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  min-height:100vh;
 }
 
-async function syncOfflineEntries() {
-  let pending = JSON.parse(localStorage.getItem("pendingEntries")) || [];
-
-  if (pending.length === 0) return;
-
-  let remaining = [];
-
-  for (let entry of pending) {
-    const { error } = await _supabase
-      .from("time_entries")
-      .insert([entry]);
-
-    if (error) {
-      remaining.push(entry);
-    }
-  }
-
-  if (remaining.length > 0) {
-    localStorage.setItem("pendingEntries", JSON.stringify(remaining));
-  } else {
-    localStorage.removeItem("pendingEntries");
-  }
+#mainCard {
+  background:white;
+  padding:30px;
+  width:90%;
+  max-width:450px;
+  border-radius:20px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.08);
+  text-align:center;
 }
-window.addEventListener("online", () => {
-  console.log("Internet restaurado. Sincronizando...");
-  syncOfflineEntries();
-});
-syncOfflineEntries();
-  </script>
 
-  <style>
-    :root {
-      --bg-color: #f8f9fa;
-      --card-bg: #ffffff;
-      --primary: #2cb3ba; /* Azul suave */
-      --text-main: #2f3640;
-      --text-muted: #7f8c8d;
-      --border: #dcdde1;
-      --success-soft: #ebfbee;
-      --success-text: #21b9bc;
-      --error-soft: #fff5f5;
-      --error-text: #cc8a27;
-    }
+#clock {
+  font-size:40px;
+  font-weight:bold;
+  color:#2cb3ba;
+}
 
-    body {
-      margin: 0;
-  font-family: 'Inter', -apple-system, sans-serif;
-  background-color: var(--bg-color);
-  color: var(--text-main);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
+input {
+  width:100%;
+  padding:15px;
+  font-size:22px;
+  margin-top:15px;
+  text-align:center;
+}
 
-  overflow: hidden;
-  user-select: none;
-  touch-action: manipulation;
-    }
+button {
+  width:48%;
+  padding:15px;
+  margin-top:15px;
+  font-size:16px;
+  cursor:pointer;
+}
 
-    #mainCard {
-      background: var(--card-bg);
-      width: 90%;
-      max-width: 450px;
-      padding: 3rem 2rem;
-      border-radius: 24px;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.05);
-      text-align: center;
-    }
+.button-group {
+  display:flex;
+  justify-content:space-between;
+}
 
-    #clockContainer {
-      margin-bottom: 2.5rem;
-    }
+#msg {
+  margin-top:20px;
+  min-height:30px;
+  font-weight:bold;
+}
 
-    #date {
-      font-size: 1.1rem;
-      color: var(--text-muted);
-      margin-bottom: 0.5rem;
-      font-weight: 500;
-    }
+.hidden { display:none; }
 
-    #clock {
-      font-size: 3.5rem;
-      font-weight: 700;
-      color: var(--primary);
-      font-variant-numeric: tabular-nums;
-    }
-
-    .input-group {
-      margin-bottom: 2rem;
-    }
-
-    label {
-      display: block;
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 0.8rem;
-    }
-
-    input#empId {
-      width: 100%;
-      padding: 1rem;
-      font-size: 2rem;
-      border: 2px solid var(--border);
-      border-radius: 16px;
-      text-align: center;
-      background: #fdfdfd;
-      transition: all 0.2s;
-      box-sizing: border-box;
-      outline: none;
-    }
-
-    input#empId:focus {
-      border-color: var(--primary);
-      background: #fff;
-      box-shadow: 0 0 0 4px rgba(74, 105, 189, 0.1);
-    }
-
-    .button-group {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
-    }
-
-    button {
-      padding: 1.2rem;
-      font-size: 1.1rem;
-      font-weight: 600;
-      border: none;
-      border-radius: 14px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    /* Botón Clock In */
-    button[onclick="clockIn()"] {
-      background-color: #eb8e55;
-      color: white;
-      border: 1px solid var(--border);
-    }
-
-    button[onclick="clockIn()"]:active {
-      background-color: #e9ecef;
-    }
-
-    /* Botón Clock Out */
-    button[onclick="clockOut()"] {
-      background-color: var(--primary);
-      color: white;
-    }
-
-    button[onclick="clockOut()"]:active {
-      opacity: 0.9;
-      transform: translateY(2px);
-    }
-
-    #msg {
-      margin-top: 2rem;
-      font-size: 1rem;
-      min-height: 50px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 12px;
-      font-weight: 500;
-    }
-
-    /* Estilos para mensajes según el contenido */
-    .msg-success { background: var(--success-soft); color: var(--success-text); }
-    .msg-error { background: var(--error-soft); color: var(--error-text); }
-
-    input[type=number]::-webkit-outer-spin-button,
-    input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-    input[type=number] { -moz-appearance: textfield; }
-
-
-    .modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0,0,0,0.6);
-  display: flex;
-  justify-content: center;
-  align-items: center;
+.modal {
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  background:rgba(0,0,0,0.6);
+  display:flex;
+  justify-content:center;
+  align-items:center;
 }
 
 .modal-content {
-  background: white;
-  padding: 20px;
-  border-radius: 8px;
-  text-align: center;
+  background:white;
+  padding:20px;
+  border-radius:10px;
+  text-align:center;
 }
 
-.hidden {
-  display: none;
+#adminPanel {
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  background:white;
+  z-index:9999;
+  padding:20px;
 }
-  </style>
+</style>
 </head>
 <body>
 
-  <div id="mainCard">
-    <div id="clockContainer">
-      <div id="date"></div>
-      <div id="clock"></div>
-    </div>
+<div id="mainCard">
+  <div id="clock"></div>
 
-    <div id="adminPanel" style="display:none;">
-  <h2>Admin Panel</h2>
-  <p id="adminInfo"></p>
-  <button onclick="closeAdmin()">Exit Admin</button>
- </div>
+  <input id="empId" type="number" placeholder="Employee ID">
 
-    <div class="input-group">
-      <label>Employee ID</label>
-      <input id="empId" type="number" placeholder="0000" min="0" max="9999" step="1" inputmode="numeric"
-      pattern="[0-9]*" oninput="if(this.value.length > 4) this.value = this.value.slice(0,4);">
-    </div>
-
-    <div class="button-group">
-      <button onclick="clockIn()">Clock In</button>
-      <button onclick="clockOut()">Clock Out</button>
-    </div>
-
-    <p id="msg"></p>
+  <div class="button-group">
+    <button onclick="clockIn()">Clock In</button>
+    <button onclick="clockOut()">Clock Out</button>
   </div>
 
+  <div id="msg"></div>
+</div>
+
+<!-- ADMIN PIN MODAL -->
+<div id="adminModal" class="modal hidden">
+  <div class="modal-content">
+    <h3>Enter Admin PIN</h3>
+    <input type="password" id="adminPinInput">
+    <br><br>
+    <button onclick="validateAdmin()">Enter</button>
+    <button onclick="closeAdminModal()">Cancel</button>
+  </div>
+</div>
+
+<!-- ADMIN PANEL -->
+<div id="adminPanel" class="hidden">
+  <h2>Admin Panel</h2>
+  <p id="adminInfo"></p>
+  <button onclick="closeAdminPanel()">Close</button>
+</div>
+
 <script>
-// --- TU LÓGICA DE SUPABASE (SIN CAMBIOS) ---
 const _supabase = supabase.createClient(
   "https://jqppakaodpgbtxzpvsti.supabase.co",
   "sb_publishable_ZwLCHMtM9uCfBFkwBcSSEQ_zQVq1RwI"
 );
 
-function updateClock() {
-  const now = new Date();
-  const timeOptions = { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true };
-  const dateOptions = { timeZone: "America/New_York", weekday: "long", year: "numeric", month: "long", day: "numeric" };
-  document.getElementById("clock").innerText = now.toLocaleTimeString("en-US", timeOptions);
-  document.getElementById("date").innerText = now.toLocaleDateString("en-US", dateOptions);
+function updateClock(){
+  document.getElementById("clock").innerText =
+    new Date().toLocaleTimeString("en-US",{hour12:true});
 }
-setInterval(updateClock, 1000);
+setInterval(updateClock,1000);
 updateClock();
 
-function clearInput() { document.getElementById("empId").value = ""; }
-
-async function employeeExists(empId) {
-  // Si no hay internet, asumir que el empleado es válido
-  if (!navigator.onLine) {
-    return true;
-  }
-
-  const { data, error } = await _supabase
-    .from("employees")
-    .select("employee_id")
-    .eq("employee_id", empId)
-    .single();
-
-  if (error) {
-    console.log("Error verificando empleado:", error.message);
-    return false;
-  }
-
-  return !!data;
+function clearInput(){
+  document.getElementById("empId").value="";
 }
 
-
-async function clockIn() {
-  const empId = document.getElementById("empId").value.trim();
-  // Acceso secreto a Admin
-if (empId === "9999") {
-  clearInput();
-  openAdmin();
-  return;
-}
-  if (!empId) return alert("Enter ID");
-  const msg = document.getElementById("msg");
-  msg.className = ""; 
-
-  const exists = await employeeExists(empId);
-  if (!exists) {
-    msg.innerText = "Employee not found";
-    msg.classList.add("msg-error");
+async function clockIn(){
+  const empId=document.getElementById("empId").value.trim();
+  if(empId==="9999"){
+    openAdmin();
+    clearInput();
     return;
   }
+  if(!empId) return alert("Enter ID");
 
-  const { data: openEntry } = await _supabase.from("time_entries").select("id").eq("employee_id", empId).is("clock_out", null).maybeSingle();
-  if (openEntry) {
-    msg.innerText = "Already checked in";
-    msg.classList.add("msg-error");
-    return;
-  }
+  const { error } = await _supabase.from("time_entries").insert([{
+    employee_id:empId,
+    clock_in:new Date().toISOString()
+  }]);
 
-  const now = new Date();
-
-const entry = {
-  employee_id: empId,
-  clock_in: now.toISOString(),
-  clock_in_local: now.toLocaleString("en-US", {
-    timeZone: "America/New_York"
-  })
-};
-
-if (!isOnline()) {
-  saveOfflineEntry(entry);
-  msg.innerText = "Saved offline";
-  clearInput();
-  return;
-}
-
-const { error } = await _supabase.from("time_entries").insert([entry]);
-  if (error) {
-    msg.innerText = error.message;
-    msg.classList.add("msg-error");
-  } else {
-    msg.innerText = "Checked In Successfully";
-    msg.classList.add("msg-success");
+  const msg=document.getElementById("msg");
+  if(error){
+    msg.innerText=error.message;
+  }else{
+    msg.innerText="Checked In Successfully";
     clearInput();
   }
 }
 
-async function clockOut() {
-  const empId = document.getElementById("empId").value.trim();
-  if (!empId) return alert("Enter ID");
-  const msg = document.getElementById("msg");
-  msg.className = "";
+async function clockOut(){
+  const empId=document.getElementById("empId").value.trim();
+  if(!empId) return alert("Enter ID");
 
-  const exists = await employeeExists(empId);
-  if (!exists) {
-    msg.innerText = "Employee not found";
-    msg.classList.add("msg-error");
-    return;
-  }
-
-  const { data: openEntry } = await _supabase
+  const { data:openEntry } = await _supabase
     .from("time_entries")
-    .select("id, clock_in")
-    .eq("employee_id", empId)
-    .is("clock_out", null)
+    .select("id")
+    .eq("employee_id",empId)
+    .is("clock_out",null)
     .maybeSingle();
 
-  if (!openEntry) {
-    msg.innerText = "No active check-in";
-    msg.classList.add("msg-error");
+  if(!openEntry){
+    document.getElementById("msg").innerText="No active check-in";
     return;
   }
 
- const now = new Date();
-const clockOutISO = now.toISOString();
-const clockOutLocal = now.toLocaleString("en-US", {
-  timeZone: "America/New_York"
-});
-  const clockInTime = new Date(openEntry.clock_in + "Z");
-  const clockOutTime = new Date(clockOutISO);
-  const shiftHours = (clockOutTime - clockInTime) / 3600000;
-  function getWeekStart(date) {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day;
-  const weekStart = new Date(d.setDate(diff));
-  weekStart.setHours(0,0,0,0);
-  return weekStart.toISOString();
-}
-  console.log("clockInTime:", clockInTime);
-console.log("clockOutTime:", clockOutTime);
-console.log("shiftHours:", shiftHours);
-const weekStart = getWeekStart(clockOutTime);
-
-  const { data: weekEntries } = await _supabase
+  await _supabase
     .from("time_entries")
-    .select("regular_hours, overtime_hours, clock_out")
-    .eq("employee_id", empId)
-    .gte("clock_in", weekStart);
+    .update({ clock_out:new Date().toISOString() })
+    .eq("id",openEntry.id);
 
-    console.log("weekEntries:", weekEntries);
-    
-
-  let weekTotal = 0;
-if (weekEntries) {
-  weekEntries.forEach(entry => {
-    if (entry.clock_out) { // solo sumamos los que ya cerraron
-      weekTotal += Number(entry.regular_hours || 0);
-      weekTotal += Number(entry.overtime_hours || 0);
-    }
-  });
+  document.getElementById("msg").innerText="Checked Out Successfully";
+  clearInput();
 }
 
-  let regularHours = 0;
-  let overtimeHours = 0;
-  if (weekTotal >= 40) {
-    overtimeHours = shiftHours;
-  } else if (weekTotal + shiftHours <= 40) {
-    regularHours = shiftHours;
-  } else {
-    regularHours = 40 - weekTotal;
-    overtimeHours = shiftHours - regularHours;
-  }
+/* ===== ADMIN SYSTEM ===== */
 
-  // --- Cálculo de pagos ---
-  const { data: employee } = await _supabase
-    .from("employees")
-    .select("hourly_rate, overtime_multiplier, tax_percent")
-    .eq("employee_id", empId)
-    .single();
-
-  const round = (num) => Math.round(num * 100) / 100;
-
-  const regularPay = round(regularHours * employee.hourly_rate);
-  const overtimePay = round(overtimeHours * employee.hourly_rate * employee.overtime_multiplier);
-  const grossPay = round(regularPay + overtimePay);
-  const taxes = round(grossPay * (employee.tax_percent / 100));
-  const netPay = round(grossPay - taxes);
-
-  // --- Guardar todo en un solo update ---
-  const clockOutLocal = new Date().toLocaleString("en-US", {
-  timeZone: "America/New_York"
-});
-
-const { error } = await _supabase
-  .from("time_entries")
-  .update({
-    clock_out: clockOutISO,
-    clock_out_local: clockOutLocal,
-    total_hours: Number(shiftHours.toFixed(4)),
-    regular_hours: Number(regularHours.toFixed(4)),
-    overtime_hours: Number(overtimeHours.toFixed(4)),
-    regular_pay: regularPay,
-    overtime_pay: overtimePay,
-    gross_pay: grossPay,
-    taxes: taxes,
-    net_pay: netPay
-  })
-  .eq("id", openEntry.id);
-
-  if (error) {
-    msg.innerText = error.message;
-    msg.classList.add("msg-error");
-  } else {
-    msg.innerText = `Out: ${regularHours.toFixed(2)} reg / ${overtimeHours.toFixed(2)} OT`;
-    msg.classList.add("msg-success");
-    clearInput();
-  }
-}
-
-// Mantener pantalla encendida (Screen Wake Lock)
-let wakeLock = null;
-
-async function keepScreenOn() {
-  try {
-    if ('wakeLock' in navigator) {
-      wakeLock = await navigator.wakeLock.request('screen');
-      console.log("Pantalla bloqueada (wake lock activo)");
-    }
-  } catch (err) {
-    console.log("Wake lock no soportado:", err);
-  }
-}
-
-// Activar cuando la app cargue
-window.addEventListener('load', keepScreenOn);
-
-// Reactivar si el usuario vuelve a la app
-document.addEventListener('visibilitychange', () => {
-  if (wakeLock !== null && document.visibilityState === 'visible') {
-    keepScreenOn();
-  }
-});
-
-history.pushState(null, null, location.href);
-window.addEventListener("popstate", function () {
-  history.pushState(null, null, location.href);
-});
-
-// ===== MODO ADMIN =====
-
-let pressTimer = null;
-const clockElement = document.getElementById("clock");
-
-function startPress() {
-  pressTimer = setTimeout(() => {
-    openAdmin();
-  }, 3000);
-}
-
-function cancelPress() {
-  if (pressTimer !== null) {
-    clearTimeout(pressTimer);
-    pressTimer = null;
-  }
-}
-
-// Eventos táctiles (Android / Tablet)
-clockElement.addEventListener("touchstart", startPress);
-clockElement.addEventListener("touchend", cancelPress);
-clockElement.addEventListener("touchcancel", cancelPress);
-
-// Eventos mouse (PC)
-clockElement.addEventListener("mousedown", startPress);
-clockElement.addEventListener("mouseup", cancelPress);
-clockElement.addEventListener("mouseleave", cancelPress);
-
-function openAdmin() {
+function openAdmin(){
   document.getElementById("adminModal").classList.remove("hidden");
-  document.getElementById("adminPinInput").value = "";
   document.getElementById("adminPinInput").focus();
 }
 
-function closeAdminModal() {
+function closeAdminModal(){
   document.getElementById("adminModal").classList.add("hidden");
-  document.getElementById("adminPinInput").value = "";
 }
 
-async function validateAdmin() {
-  const pin = document.getElementById("adminPinInput").value.trim();
-  if (!pin) return;
+async function validateAdmin(){
+  const pin=document.getElementById("adminPinInput").value.trim();
+  if(!pin) return;
 
-  const { data, error } = await _supabase
+  const { data } = await _supabase
     .from("admins")
     .select("*")
-    .eq("pin", pin)
-    .eq("active", true)
+    .eq("pin",pin)
+    .eq("active",true)
     .single();
 
-  if (error || !data) {
+  if(!data){
     alert("Wrong PIN");
     return;
   }
 
-  window.currentAdmin = data;
   closeAdminModal();
-
-  alert("Admin Mode Activated (" + data.role + ")");
   showAdminPanel(data);
 }
 
-function showAdminPanel(admin) {
-  console.log("SHOW PANEL CALLED", admin);
-  // Ocultar pantalla principal
-  document.getElementById("mainApp").style.display = "none";
-
-  // Mostrar panel admin
-  const panel = document.getElementById("adminPanel");
-  panel.classList.remove("hidden");
-
-  // Mostrar info del admin
-  document.getElementById("adminInfo").innerText =
-    "Welcome " + admin.name + " (" + admin.role + ")";
-}
-
-function closeAdminPanel() {
-  document.getElementById("adminPanel").classList.add("hidden");
-  document.getElementById("mainApp").style.display = "block";
-}
-
-function isOwner() {
-  return window.currentAdmin && window.currentAdmin.role === "owner";
-}
-
-function isManager() {
-  return window.currentAdmin && 
-         (window.currentAdmin.role === "manager" || window.currentAdmin.role === "owner");
-}
-
-function openAdminPanel() {
+function showAdminPanel(admin){
+  document.getElementById("mainCard").style.display="none";
   document.getElementById("adminPanel").classList.remove("hidden");
+  document.getElementById("adminInfo").innerText=
+    "Welcome "+admin.name+" ("+admin.role+")";
 }
 
-function closeAdminPanel() {
+function closeAdminPanel(){
   document.getElementById("adminPanel").classList.add("hidden");
+  document.getElementById("mainCard").style.display="block";
 }
 </script>
 
-<div id="adminModal" class="modal hidden">
-  <div class="modal-content">
-    <h3>Enter Admin PIN</h3>
-    <input type="password" id="adminPinInput" placeholder="PIN" />
-    <button onclick="validateAdmin()">Enter</button>
-    <button onclick="closeAdminModal()">Cancel</button>
-  </div>
- </div>
- <!-- ADMIN PANEL -->
-<div id="adminPanel" class="hidden" style="
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: white;
-  z-index: 9999;
-  overflow: auto;
-  padding: 20px;
-">
-  <h2>Admin Panel</h2>
-  <div id="adminContent">
-    <p>Loading...</p>
-  </div>
-  <button onclick="closeAdminPanel()">Close</button>
-
-</div>
 </body>
 </html>
