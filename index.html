@@ -414,10 +414,46 @@ async function validateAdmin() {
 }
 
 function showAdminPanel(admin) {
+  window.currentAdmin = admin;
+
   document.getElementById("mainCard").style.display = "none";
-  const panel = document.getElementById("adminPanel");
-  panel.classList.remove("hidden");
-  document.getElementById("adminContent").innerHTML = `<p>Welcome ${admin.name} (${admin.role})</p>`;
+  document.getElementById("adminPanel").classList.remove("hidden");
+
+  document.getElementById("adminInfo").innerText =
+    "Welcome " + admin.name + " (" + admin.role + ")";
+
+  const actions = document.getElementById("adminActions");
+  actions.innerHTML = "";
+
+  // Owner puede hacer todo
+  if (admin.role === "owner") {
+    actions.innerHTML += `<button onclick="manageEmployees()">Manage Employees</button><br><br>`;
+    actions.innerHTML += `<button onclick="viewTimeEntries()">View Time Entries</button><br><br>`;
+    actions.innerHTML += `<button onclick="exportReport()">Export Report</button><br><br>`;
+    actions.innerHTML += `<button onclick="createAdmin()">Create Admin</button><br><br>`;
+  }
+
+  // Manager puede hacer casi todo menos crear admin
+  if (admin.role === "manager") {
+    actions.innerHTML += `<button onclick="manageEmployees()">Manage Employees</button><br><br>`;
+    actions.innerHTML += `<button onclick="viewTimeEntries()">View Time Entries</button><br><br>`;
+    actions.innerHTML += `<button onclick="exportReport()">Export Report</button><br><br>`;
+  }
+}
+function manageEmployees() {
+  alert("Manage Employees panel coming next");
+}
+
+function viewTimeEntries() {
+  alert("View Time Entries panel coming next");
+}
+
+function exportReport() {
+  alert("Export system coming next");
+}
+
+function createAdmin() {
+  alert("Create Admin panel coming next");
 }
 
 function closeAdminPanel() {
@@ -436,9 +472,12 @@ function closeAdminPanel() {
 </div>
 
 <div id="adminPanel" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 9999; overflow: auto; padding: 20px;">
-  <h2>Admin Panel</h2>
-  <div id="adminContent"></div>
-  <button onclick="closeAdminPanel()">Close</button>
+  <h2>Admin Dashboard</h2>
+<p id="adminInfo"></p>
+
+<div id="adminActions"></div>
+
+<button onclick="closeAdminPanel()">Close</button>
 </div>
 
 </body>
