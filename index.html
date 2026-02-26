@@ -462,22 +462,52 @@ async function viewTimeEntries() {
 
   let html = "<h3>Recent Time Entries</h3>";
   html += "<table border='1' style='width:100%; font-size:12px;'>";
-  html += "<tr><th>Employee</th><th>Clock In</th><th>Clock Out</th></tr>";
+ html += "<tr><th>Employee</th><th>Clock In</th><th>Clock Out</th><th>Action</th></tr>";
 
-  data.forEach(entry => {
-    html += `
-      <tr>
-        <td>${entry.employee_id}</td>
-        <td>${entry.clock_in ? new Date(entry.clock_in).toLocaleString() : "-"}</td>
-        <td>${entry.clock_out ? new Date(entry.clock_out).toLocaleString() : "OPEN"}</td>
-      </tr>
-    `;
-  });
+ data.forEach(entry => {
+
+  let clockOutDisplay = entry.clock_out
+    ? new Date(entry.clock_out).toLocaleString()
+    : "OPEN";
+
+  let actionButton = "";
+
+  if (!entry.clock_out) {
+    actionButton = `<button onclick="adminCloseEntry('${entry.id}')">Close Now</button>`;
+  }
+
+  html += `
+    <tr>
+      <td>${entry.employee_id}</td>
+      <td>${new Date(entry.clock_in).toLocaleString()}</td>
+      <td>${clockOutDisplay}</td>
+      <td>${actionButton}</td>
+    </tr>
+  `;
+});
 
   html += "</table><br>";
   html += `<button onclick="showAdminPanel(window.currentAdmin)">Back</button>`;
 
   actions.innerHTML = html;
+}
+
+async function adminCloseEntry(entryId) {
+
+  if (!confirm("Close this entry now?")) return;
+
+  const { error } = await _supabase
+    .from("time_entries")
+    .update({ clock_out: new Date().toISOString() })
+    .eq("id", entryId);
+
+  if (error) {
+    alert("Error closing entry");
+    return;
+  }
+
+  alert("Entry closed successfully");
+  viewTimeEntries();
 }
 
 function exportReport() {
