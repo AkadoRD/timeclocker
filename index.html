@@ -444,8 +444,40 @@ function manageEmployees() {
   alert("Manage Employees panel coming next");
 }
 
-function viewTimeEntries() {
-  alert("View Time Entries panel coming next");
+async function viewTimeEntries() {
+  const actions = document.getElementById("adminActions");
+
+  actions.innerHTML = "<h3>Loading time entries...</h3>";
+
+  const { data, error } = await _supabase
+    .from("time_entries")
+    .select("*")
+    .order("clock_in", { ascending: false })
+    .limit(50);
+
+  if (error) {
+    actions.innerHTML = "Error loading entries";
+    return;
+  }
+
+  let html = "<h3>Recent Time Entries</h3>";
+  html += "<table border='1' style='width:100%; font-size:12px;'>";
+  html += "<tr><th>Employee</th><th>Clock In</th><th>Clock Out</th></tr>";
+
+  data.forEach(entry => {
+    html += `
+      <tr>
+        <td>${entry.employee_id}</td>
+        <td>${entry.clock_in ? new Date(entry.clock_in).toLocaleString() : "-"}</td>
+        <td>${entry.clock_out ? new Date(entry.clock_out).toLocaleString() : "OPEN"}</td>
+      </tr>
+    `;
+  });
+
+  html += "</table><br>";
+  html += `<button onclick="showAdminPanel(window.currentAdmin)">Back</button>`;
+
+  actions.innerHTML = html;
 }
 
 function exportReport() {
