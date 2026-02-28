@@ -210,6 +210,8 @@ const _supabase = supabase.createClient(
   "sb_publishable_ZwLCHMtM9uCfBFkwBcSSEQ_zQVq1RwI"
 );
 
+let editingEntryId = null;
+
 function updateClock() {
   const now = new Date();
   const timeOptions = { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true };
@@ -263,6 +265,20 @@ async function clockIn() {
     clearInput();
     return;
   }
+
+// 🔎 Validar empleado antes de insertar
+const { data: employee, error: empError } = await _supabase
+  .from("employees")
+  .select("*")
+  .eq("employee_id", entry.employee_id)
+  .eq("active", true)
+  .single();
+
+if (empError || !employee) {
+  msg.innerText = "Invalid or inactive employee ID";
+  msg.classList.add("msg-error");
+  return;
+}
 
   const { error } = await _supabase.from("time_entries").insert([entry]);
   if (error) {
@@ -469,11 +485,15 @@ async function viewTimeEntries() {
     ? new Date(entry.clock_out).toLocaleString()
     : "OPEN";
 
-  let actionButton = "";
+  let actionButton = `
+  <button onclick="openEditEntry('${entry.id}')">Edit</button>
+`;
 
-  if (!entry.clock_out) {
-    actionButton = `<button onclick="adminCloseEntry('${entry.id}')">Close Now</button>`;
-  }
+if (!entry.clock_out) {
+  actionButton += `
+    <button onclick="adminCloseEntry('${entry.id}')">Close Now</button>
+  `;
+}
 
   html += `
     <tr>
@@ -521,6 +541,95 @@ function closeAdminPanel() {
   document.getElementById("adminPanel").classList.add("hidden");
   document.getElementById("mainCard").style.display = "block";
 }
+
+async function openEditEntry(id) {
+  editingEntryId = id;
+
+  const { data, error } = await _supabase
+    .from("time_entries")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error) {
+    alert("Error loading entry");
+    return;
+  }
+
+  document.getElementById("editClockIn").value =
+    data.clock_in ? new Date(data.clock_in).toISOString().slice(0,16) : "";
+
+  document.getElementById("editClockOut").value =
+    data.clock_out ? new Date(data.clock_out).toISOString().slice(0,16) : "";
+
+  document.getElementById("editEntryModal").classList.remove("hidden");
+}
+
+function closeEditModal() {
+  editingEntryId = null;
+  document.getElementById("editEntryModal").classList.add("hidden");
+}
+
+async function saveEditedEntry() {
+  if (!editingEntryId) return;
+
+  const newClockIn = document.getElementById("editClockIn").value;
+  const newClockOut = document.getElementById("editClockOut").value;
+
+  if (!newClockIn || !newClockOut) {
+    alert("Both times required");
+    return;
+  }
+
+  const clockInDate = new Date(newClockIn);
+  const clockOutDate = new Date(newClockOut);
+
+  if (clockOutDate <= clockInDate) {
+    alert("Clock out must be after clock in");
+    return;
+  }
+
+  const shiftHours = (clockOutDate - clockInDate) / 3600000;
+
+  // Obtener empleado
+  const { data: entryData } = await _supabase
+    .from("time_entries")
+    .select("employee_id")
+    .eq("id", editingEntryId)
+    .single();
+
+  const { data: employee } = await _supabase
+    .from("employees")
+    .select("hourly_rate, overtime_multiplier")
+    .eq("employee_id", entryData.employee_id)
+    .single();
+
+  const regularHours = Math.min(shiftHours, 40);
+  const overtimeHours = Math.max(shiftHours - 40, 0);
+
+  const regularPay = regularHours * employee.hourly_rate;
+  const overtimePay = overtimeHours * employee.hourly_rate * employee.overtime_multiplier;
+  const grossPay = regularPay + overtimePay;
+
+  const { error } = await _supabase
+    .from("time_entries")
+    .update({
+      clock_in: clockInDate.toISOString(),
+      clock_out: clockOutDate.toISOString(),
+      regular_hours: regularHours,
+      overtime_hours: overtimeHours,
+      gross_pay: grossPay
+    })
+    .eq("id", editingEntryId);
+
+  if (error) {
+    alert("Error saving changes");
+    return;
+  }
+
+  closeEditModal();
+  viewTimeEntries();
+}
 </script>
 
 <div id="adminModal" class="modal hidden">
@@ -539,6 +648,21 @@ function closeAdminPanel() {
 <div id="adminActions"></div>
 
 <button onclick="closeAdminPanel()">Close</button>
+</div>
+
+<div id="editEntryModal" class="modal hidden">
+  <div class="modal-content">
+    <h3>Edit Time Entry</h3>
+
+    <label>Clock In</label>
+    <input type="datetime-local" id="editClockIn" />
+
+    <label>Clock Out</label>
+    <input type="datetime-local" id="editClockOut" />
+
+    <button onclick="saveEditedEntry()">Save</button>
+    <button onclick="closeEditModal()">Cancel</button>
+  </div>
 </div>
 
 </body>
