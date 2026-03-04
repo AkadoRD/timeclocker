@@ -6,10 +6,16 @@
   <title>Admin Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 40px; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 20px; background-color: #f8f9fa; }
     .hidden { display: none !important; }
+    .panel { background: white; padding: 20px; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.08); max-width: 800px; margin: 20px auto; }
     .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 10000; }
     .modal-content { background: white; padding: 20px; border-radius: 8px; text-align: center; }
+    button { background-color: #2cb3ba; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-size: 1rem; margin: 5px; }
+    button:hover { opacity: 0.9; }
+    table { width:100%; font-size:14px; border-collapse: collapse; }
+    th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+    h2, h3, h4 { color: #2f3640; }
   </style>
 </head>
 <body>
@@ -23,7 +29,7 @@
   }
 </script>
 
-<div id="adminPanel">
+<div id="adminPanel" class="panel">
   <h2>Admin Dashboard</h2>
   <p id="adminInfo"></p>
 
@@ -46,7 +52,7 @@
   <button onclick="logout()">Logout</button>
 </div>
 
-<div id="manageEmployeesPanel" class="hidden">
+<div id="manageEmployeesPanel" class="panel hidden">
   <h2>Manage Employees</h2>
   <button onclick="showNewEmployeeForm()">Create New Employee</button>
   <hr>
@@ -74,7 +80,7 @@
 
   <div id="employeeListContainer"></div>
   <br>
-  <button onclick="showAdminPanel()">Back to Admin Panel</button>
+  <button onclick="showAdminDashboard()">Back to Admin Panel</button>
 </div>
 
 <div id="editEntryModal" class="modal hidden">
@@ -93,7 +99,6 @@
 let editingEntryId = null;
 let editingEmployeeId = null;
 
-// Utility functions (getWeekStart, parseDbTimestamp etc. - needed for admin actions)
 function getWeekStart(date) {
   const d = new Date(date);
   const day = d.getDay();
@@ -101,15 +106,6 @@ function getWeekStart(date) {
   const weekStart = new Date(d.setDate(diff));
   weekStart.setHours(0,0,0,0);
   return weekStart;
-}
-
-function getWeekEnd(date) {
-    const d = new Date(date);
-    const day = d.getDay();
-    const diff = d.getDate() - day + 6;
-    const weekEnd = new Date(d.setDate(diff));
-    weekEnd.setHours(23, 59, 59, 999);
-    return weekEnd;
 }
 
 function parseDbTimestamp(value) {
@@ -123,50 +119,33 @@ function parseDbTimestamp(value) {
   return isNaN(d.getTime()) ? null : d;
 }
 
-
 async function updateDashboardMetrics() {
   document.getElementById("metricHoursToday").innerText = "...";
   document.getElementById("metricClockedIn").innerText = "...";
   document.getElementById("metricWeeklyPayroll").innerText = "...";
-
-  const { count: clockedInCount, error: clockedInError } = await _supabase.from("time_entries").select('*', { count: 'exact', head: true }).is("clock_out", null);
-  document.getElementById("metricClockedIn").innerText = clockedInError ? 'Error' : clockedInCount;
-
+  const { count: clockedInCount } = await _supabase.from("time_entries").select('*', { count: 'exact', head: true }).is("clock_out", null);
+  document.getElementById("metricClockedIn").innerText = clockedInCount ?? 'Error';
   const now = new Date();
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
   const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-
-  const { data: todayEntries, error: todayError } = await _supabase.from("time_entries").select("total_hours").gte("clock_in", startOfDay.toISOString()).lte("clock_in", endOfDay.toISOString());
-  
+  const { data: todayEntries } = await _supabase.from("time_entries").select("total_hours").gte("clock_in", startOfDay.toISOString()).lte("clock_in", endOfDay.toISOString());
   let totalHoursToday = 0;
   if (todayEntries) { totalHoursToday = todayEntries.reduce((sum, entry) => sum + (entry.total_hours || 0), 0); }
-  document.getElementById("metricHoursToday").innerText = todayError ? 'Error' : totalHoursToday.toFixed(2);
-
+  document.getElementById("metricHoursToday").innerText = totalHoursToday.toFixed(2);
   const weekStart = getWeekStart(new Date()).toISOString();
-  const { data: weekEntries, error: weekError } = await _supabase.from("time_entries").select("gross_pay").gte("clock_in", weekStart);
-
+  const { data: weekEntries } = await _supabase.from("time_entries").select("gross_pay").gte("clock_in", weekStart);
   let weeklyPayroll = 0;
   if (weekEntries) { weeklyPayroll = weekEntries.reduce((sum, entry) => sum + (entry.gross_pay || 0), 0); }
-  document.getElementById("metricWeeklyPayroll").innerText = weekError ? 'Error' : \`$\${(weeklyPayroll || 0).toFixed(2)}\`;
+  document.getElementById("metricWeeklyPayroll").innerText = `$${(weeklyPayroll || 0).toFixed(2)}`;
 }
 
-function showAdminPanel() {
+function showAdminDashboard() {
   document.getElementById("manageEmployeesPanel").classList.add("hidden");
   document.getElementById("adminPanel").classList.remove("hidden");
-  const admin = JSON.parse(sessionStorage.getItem('adminData'));
-  if (admin) {
-    document.getElementById("adminInfo").innerText = \`Welcome \${admin.name} (\${admin.role})\`;
-    const actions = document.getElementById("adminActions");
-    actions.innerHTML = "";
-    if (admin.role === "owner" || admin.role === "manager") {
-      actions.innerHTML += \`<button onclick="manageEmployees()">Manage Employees</button><br><br>\`;
-      actions.innerHTML += \`<button onclick="viewTimeEntries()">View Time Entries</button><br><br>\`;
-      actions.innerHTML += \`<button onclick="exportReport()">Export Report</button><br><br>\`;
-    }
-    if (admin.role === "owner") {
-      actions.innerHTML += \`<button onclick="createAdmin()">Create Admin</button><br><br>\`;
-    }
-    updateDashboardMetrics();
+  // Also hide other panels if they exist
+  const adminActions = document.getElementById('adminActions');
+  if (adminActions.querySelector('h3')) { // if viewing time entries
+    initializeApp(); // Re-initialize to show main dashboard
   }
 }
 
@@ -184,10 +163,10 @@ async function renderEmployeeList() {
     container.innerHTML = "<h3>Loading employees...</h3>";
     const { data, error } = await _supabase.from("employees").select("*").order("employee_id", { ascending: true });
     if (error) { container.innerHTML = "Error loading employees."; return; }
-    let html = "<h3>Current Employees</h3><table border='1' style='width:100%; font-size:12px; border-collapse: collapse;'><tr style='text-align: left;'><th>ID</th><th>Name</th><th>Rate</th><th>Status</th><th>Action</th></tr>";
+    let html = "<h3>Current Employees</h3><table><tr><th>ID</th><th>Name</th><th>Rate</th><th>Status</th><th>Action</th></tr>";
     data.forEach(emp => {
       const status = emp.active ? "Active" : "Inactive";
-      html += \`<tr style="border-top: 1px solid #ccc;"><td style="padding: 4px;">\${emp.employee_id}</td><td style="padding: 4px;">\${emp.name}</td><td style="padding: 4px;">$\${emp.hourly_rate}/hr</td><td style="padding: 4px;">\${status}</td><td style="padding: 4px;"><button onclick="openEditEmployeeForm('\${emp.id}')">Edit</button></td></tr>\`;
+      html += `<tr><td>${emp.employee_id}</td><td>${emp.name}</td><td>$${emp.hourly_rate}/hr</td><td>${status}</td><td><button onclick=\"openEditEmployeeForm('${emp.id}')\">Edit</button></td></tr>`;
     });
     html += "</table><br>";
     container.innerHTML = html;
@@ -195,7 +174,6 @@ async function renderEmployeeList() {
 
 function showNewEmployeeForm() {
   document.getElementById("employeeListContainer").classList.add("hidden");
-  document.getElementById("editEmployeeFormContainer").classList.add("hidden");
   document.getElementById("newEmployeeFormContainer").classList.remove("hidden");
   document.getElementById("newEmpId").value = "";
   document.getElementById("newEmpName").value = "";
@@ -254,35 +232,28 @@ async function saveEditedEmployee() {
     updateData.pin = pin;
   }
   const { error } = await _supabase.from("employees").update(updateData).eq("id", editingEmployeeId);
-  if (error) { alert("Error updating employee: " + error.message); }
+  if (error) { alert("Error updating employee: " + error.message); } 
   else { alert("Employee updated successfully!"); cancelEditEmployee(); renderEmployeeList(); }
 }
 
 async function viewTimeEntries() {
   const container = document.getElementById("adminActions");
   container.innerHTML = "<h3>Loading time entries...</h3>";
-  const { data, error } = await _supabase.from("time_entries").select("*").order("clock_in", { ascending: false }).limit(50);
+  const { data, error } = await _supabase.from("time_entries").select("*, employees(name)").order("clock_in", { ascending: false }).limit(50);
   if (error) { container.innerHTML = "Error loading entries"; return; }
-  let html = "<h3>Recent Time Entries</h3><table border='1' style='width:100%; font-size:12px; border-collapse: collapse;'><tr><th>Employee</th><th>Clock In</th><th>Clock Out</th><th>Regular</th><th>Overtime</th><th>Gross Pay</th><th>Action</th></tr>";
+  let html = "<h3>Recent Time Entries</h3><table><tr><th>Employee</th><th>Clock In</th><th>Clock Out</th><th>Regular</th><th>Overtime</th><th>Gross Pay</th><th>Action</th></tr>";
   data.forEach(entry => {
     let clockOutDisplay = entry.clock_out ? parseDbTimestamp(entry.clock_out)?.toLocaleString() || "INVALID" : "OPEN";
-    let actionButton = \`<button onclick="openEditEntry('\${entry.id}')">Edit</button>\`;
-    if (!entry.clock_out) { actionButton += \` <button onclick="adminCloseEntry('\${entry.id}')">Close</button>\`; }
+    let actionButton = `<button onclick=\"openEditEntry('${entry.id}')\">Edit</button>`;
+    if (!entry.clock_out) { actionButton += ` <button onclick=\"adminCloseEntry('${entry.id}')\">Close</button>`; }
     const regHours = entry.regular_hours ? Number(entry.regular_hours).toFixed(2) : '-';
     const otHours = entry.overtime_hours ? Number(entry.overtime_hours).toFixed(2) : '-';
-    const grossPay = entry.gross_pay ? \`$\${Number(entry.gross_pay).toFixed(2)}\` : '-';
-    html += \`<tr style="border-top: 1px solid #ccc;"><td style="padding: 4px;">\${entry.employee_id}</td><td style="padding: 4px;">\${parseDbTimestamp(entry.clock_in)?.toLocaleString() || "INVALID"}</td><td style="padding: 4px;">\${clockOutDisplay}</td><td style="padding: 4px;">\${regHours}</td><td style="padding: 4px;">\${otHours}</td><td style="padding: 4px;">\${grossPay}</td><td style="padding: 4px;">\${actionButton}</td></tr>\`;
+    const grossPay = entry.gross_pay ? `$${Number(entry.gross_pay).toFixed(2)}` : '-';
+    html += `<tr><td>${entry.employees.name} (${entry.employee_id})</td><td>${parseDbTimestamp(entry.clock_in)?.toLocaleString() || "INVALID"}</td><td>${clockOutDisplay}</td><td>${regHours}</td><td>${otHours}</td><td>${grossPay}</td><td>${actionButton}</td></tr>`;
   });
-  html += "</table><br><button onclick='showAdminPanel()'>Back</button>";
+  html += "</table><br><button onclick='showAdminDashboard()'>Back</button>";
   container.innerHTML = html;
 }
-
-async function adminCloseEntry(entryId) {
-    // This function logic remains the same
-}
-
-function exportReport() { alert("Export system coming next"); }
-function createAdmin() { alert("Create Admin panel coming next"); }
 
 function logout() {
   sessionStorage.removeItem('adminAuthenticated');
@@ -290,8 +261,35 @@ function logout() {
   window.location.href = 'index.html';
 }
 
-// Initial load
-showAdminPanel();
+function initializeApp() {
+    const adminData = sessionStorage.getItem('adminData');
+    if (!adminData) {
+        console.error("Admin data not found. Logging out.");
+        logout();
+        return;
+    }
+    const admin = JSON.parse(adminData);
+    
+    document.getElementById("adminInfo").innerText = `Welcome ${admin.name} (${admin.role})`;
+
+    const actions = document.getElementById("adminActions");
+    actions.innerHTML = "";
+    if (admin.role === "owner" || admin.role === "manager") {
+        actions.innerHTML += `<button onclick=\"manageEmployees()\">Manage Employees</button><br><br>`;
+        actions.innerHTML += `<button onclick=\"viewTimeEntries()\">View Time Entries</button><br><br>`;
+        actions.innerHTML += `<button onclick=\"exportReport()\">Export Report</button><br><br>`;
+    }
+    if (admin.role === "owner") {
+        actions.innerHTML += `<button onclick=\"createAdmin()\">Create Admin</button><br><br>`;
+    }
+
+    document.getElementById("adminPanel").classList.remove("hidden");
+    document.getElementById("manageEmployeesPanel").classList.add("hidden");
+
+    updateDashboardMetrics();
+}
+
+document.addEventListener('DOMContentLoaded', initializeApp);
 
 </script>
 </body>
