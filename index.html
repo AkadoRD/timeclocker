@@ -621,30 +621,42 @@ async function viewTimeEntries() {
   }
 
   let html = "<h3>Recent Time Entries</h3>";
-  html += "<table border='1' style='width:100%; font-size:12px;'>";
-  html += "<tr><th>Employee</th><th>Clock In</th><th>Clock Out</th><th>Action</th></tr>";  
+  html += "<table border='1' style='width:100%; font-size:12px; border-collapse: collapse;'>";
+  html += `
+    <tr style="text-align: left;">
+        <th>Employee</th>
+        <th>Clock In</th>
+        <th>Clock Out</th>
+        <th>Regular</th>
+        <th>Overtime</th>
+        <th>Gross Pay</th>
+        <th>Action</th>
+    </tr>`;  
+
  data.forEach(entry => {
 
   let clockOutDisplay = entry.clock_out
     ? parseDbTimestamp(entry.clock_out)?.toLocaleString() || "INVALID"
     : "OPEN";
 
-  let actionButton = `
-  <button onclick="openEditEntry('${entry.id}')">Edit</button>
-`;
+  let actionButton = `<button onclick="openEditEntry('${entry.id}')">Edit</button>`;
+  if (!entry.clock_out) {
+    actionButton += ` <button onclick="adminCloseEntry('${entry.id}')">Close</button>`;
+  }
 
-if (!entry.clock_out) {
-  actionButton += `
-    <button onclick="adminCloseEntry('${entry.id}')">Close Now</button>
-  `;
-}
+  const regHours = entry.regular_hours ? Number(entry.regular_hours).toFixed(2) : '-';
+  const otHours = entry.overtime_hours ? Number(entry.overtime_hours).toFixed(2) : '-';
+  const grossPay = entry.gross_pay ? `$${Number(entry.gross_pay).toFixed(2)}` : '-';
 
   html += `
-    <tr>
-      <td>${entry.employee_id}</td>
-      <td>${parseDbTimestamp(entry.clock_in)?.toLocaleString() || "INVALID"}</td>
-      <td>${clockOutDisplay}</td>
-      <td>${actionButton}</td>
+    <tr style="border-top: 1px solid #ccc;">
+      <td style="padding: 4px;">${entry.employee_id}</td>
+      <td style="padding: 4px;">${parseDbTimestamp(entry.clock_in)?.toLocaleString() || "INVALID"}</td>
+      <td style="padding: 4px;">${clockOutDisplay}</td>
+      <td style="padding: 4px;">${regHours}</td>
+      <td style="padding: 4px;">${otHours}</td>
+      <td style="padding: 4px;">${grossPay}</td>
+      <td style="padding: 4px;">${actionButton}</td>
     </tr>
   `;
 });
@@ -654,6 +666,7 @@ if (!entry.clock_out) {
 
   actions.innerHTML = html;
 }
+
 
 async function adminCloseEntry(entryId) {
 
