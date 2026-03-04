@@ -28,7 +28,6 @@
     }
 
     async function syncOfflineEntries() {
-      // Evita errores si Supabase aún no está inicializado
       if (typeof _supabase === "undefined") {
         console.warn("Supabase not ready yet, will sync later.");
         return;
@@ -216,7 +215,6 @@ const _supabase = supabase.createClient(
   "sb_publishable_ZwLCHMtM9uCfBFkwBcSSEQ_zQVq1RwI"
 );
 
-// Asegura que la sincronización offline se intente nuevamente
 if (typeof syncOfflineEntries === "function") {
   syncOfflineEntries();
 }
@@ -259,23 +257,17 @@ function getWeekEnd(date) {
     return weekEnd;
 }
 
-// Normaliza timestamps que vienen de la base (con o sin zona horaria)
 function parseDbTimestamp(value) {
   if (!value) return null;
   if (value instanceof Date) return value;
   let s = String(value).trim();
   if (!s) return null;
-
-  // Reemplaza espacio por 'T' si viene como "2026-03-01 18:08:51.106"
   if (!s.includes("T")) {
     s = s.replace(" ", "T");
   }
-
-  // Si no tiene zona horaria explícita, asumimos UTC
   if (!/[zZ]|[+-]\d\d:?\d\d$/.test(s)) {
     s += "Z";
   }
-
   const d = new Date(s);
   return isNaN(d.getTime()) ? null : d;
 }
@@ -309,7 +301,6 @@ async function clockIn() {
     clock_in_local: now.toLocaleString("en-US", { timeZone: "America/New_York" })
   };
 
-  // Guardamos también el clock in local en este dispositivo para calcular horas sin depender de zonas horarias del servidor
   try {
     localStorage.setItem(`clockIn_${empId}`, now.toISOString());
   } catch (e) {
@@ -323,7 +314,6 @@ async function clockIn() {
     return;
   }
 
-// 🔎 Validar empleado antes de insertar
 const { data: employee, error: empError } = await _supabase
   .from("employees")
   .select("*")
@@ -373,7 +363,6 @@ async function clockOut() {
   const clockOutISO = now.toISOString();
   const clockOutLocalStr = now.toLocaleString("en-US", { timeZone: "America/New_York" });
   
-  // Hora de entrada: 1) localStorage (mismo dispositivo), 2) clock_in de la base como UTC
   let clockInTime = null;
   try {
     const stored = localStorage.getItem(`clockIn_${empId}`);
@@ -394,7 +383,6 @@ async function clockOut() {
 
   let shiftHours = (now - clockInTime) / 3600000;
 
-  // NUNCA guardar ni mostrar horas negativas (protección contra zona horaria/caché)
   if (shiftHours < 0) {
     shiftHours = 0;
   }
@@ -514,7 +502,6 @@ async function updateDashboardMetrics() {
   document.getElementById("metricClockedIn").innerText = "...";
   document.getElementById("metricWeeklyPayroll").innerText = "...";
 
-  // 1. Total employees currently clocked in
   const { count: clockedInCount, error: clockedInError } = await _supabase
     .from("time_entries")
     .select('*', { count: 'exact', head: true })
@@ -522,7 +509,6 @@ async function updateDashboardMetrics() {
   if(clockedInError) console.error("Dashboard metric error (clockedIn):", clockedInError);
   document.getElementById("metricClockedIn").innerText = clockedInError ? 'Error' : clockedInCount;
 
-  // 2. Total hours today
   const now = new Date();
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
   const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
@@ -540,7 +526,6 @@ async function updateDashboardMetrics() {
   }
   document.getElementById("metricHoursToday").innerText = todayError ? 'Error' : totalHoursToday.toFixed(2);
 
-  // 3. Weekly payroll total
   const weekStart = getWeekStart(new Date()).toISOString();
   const { data: weekEntries, error: weekError } = await _supabase
     .from("time_entries")
@@ -559,6 +544,7 @@ function showAdminPanel(admin) {
   window.currentAdmin = admin;
 
   document.getElementById("mainCard").style.display = "none";
+  document.getElementById("manageEmployeesPanel").classList.add("hidden");
   document.getElementById("adminPanel").classList.remove("hidden");
 
   updateDashboardMetrics();
@@ -569,24 +555,66 @@ function showAdminPanel(admin) {
   const actions = document.getElementById("adminActions");
   actions.innerHTML = "";
 
-  // Owner puede hacer todo
-  if (admin.role === "owner") {
+  if (admin.role === "owner" || admin.role === "manager") {
     actions.innerHTML += `<button onclick="manageEmployees()">Manage Employees</button><br><br>`;
     actions.innerHTML += `<button onclick="viewTimeEntries()">View Time Entries</button><br><br>`;
     actions.innerHTML += `<button onclick="exportReport()">Export Report</button><br><br>`;
+  }
+  if (admin.role === "owner") {
     actions.innerHTML += `<button onclick="createAdmin()">Create Admin</button><br><br>`;
   }
+}
 
-  // Manager puede hacer casi todo menos crear admin
-  if (admin.role === "manager") {
-    actions.innerHTML += `<button onclick="manageEmployees()">Manage Employees</button><br><br>`;
-    actions.innerHTML += `<button onclick="viewTimeEntries()">View Time Entries</button><br><br>`;
-    actions.innerHTML += `<button onclick="exportReport()">Export Report</button><br><br>`;
-  }
+async function manageEmployees() {
+  document.getElementById("adminPanel").classList.add("hidden");
+  document.getElementById("manageEmployeesPanel").classList.remove("hidden");
+  await renderEmployeeList();
 }
-function manageEmployees() {
-  alert("Manage Employees panel coming next");
+
+async function renderEmployeeList() {
+    const container = document.getElementById("employeeListContainer");
+    container.innerHTML = "<h3>Loading employees...</h3>";
+
+    const { data, error } = await _supabase
+      .from("employees")
+      .select("*")
+      .order("employee_id", { ascending: true });
+
+    if (error) {
+      container.innerHTML = "Error loading employees.";
+      return;
+    }
+
+    let html = "<h3>Current Employees</h3>";
+    html += "<table border='1' style='width:100%; font-size:12px; border-collapse: collapse;'>";
+    html += `
+      <tr style="text-align: left;">
+          <th>ID</th>
+          <th>Name</th>
+          <th>Rate</th>
+          <th>Status</th>
+          <th>Action</th>
+      </tr>`;
+
+    data.forEach(emp => {
+      const status = emp.active ? "Active" : "Inactive";
+      html += `
+        <tr style="border-top: 1px solid #ccc;">
+          <td style="padding: 4px;">${emp.employee_id}</td>
+          <td style="padding: 4px;">${emp.name}</td>
+          <td style="padding: 4px;">$${emp.hourly_rate}/hr</td>
+          <td style="padding: 4px;">${status}</td>
+          <td style="padding: 4px;">
+            <button onclick="alert('Edit employee ${emp.id}')">Edit</button>
+          </td>
+        </tr>
+      `;
+    });
+
+    html += "</table><br>";
+    container.innerHTML = html;
 }
+
 
 async function viewTimeEntries() {
   const actions = document.getElementById("adminActions");
@@ -618,7 +646,6 @@ async function viewTimeEntries() {
     </tr>`;  
 
  data.forEach(entry => {
-
   let clockOutDisplay = entry.clock_out
     ? parseDbTimestamp(entry.clock_out)?.toLocaleString() || "INVALID"
     : "OPEN";
@@ -677,12 +704,6 @@ async function adminCloseEntry(entryId) {
     return;
   }
   const shiftHours = (now - clockInTime) / 3600000;
-  console.log("DEBUG adminCloseEntry", {
-    dbClockIn: entry.clock_in,
-    parsedClockIn: clockInTime.toISOString(),
-    nowIso: now.toISOString(),
-    shiftHours
-  });
 
   const weekStart = getWeekStart(now).toISOString();
   const { data: weekEntries } = await _supabase
@@ -824,7 +845,6 @@ async function saveEditedEntry() {
       return;
   }
 
-  // 1. Obtener la entrada y el empleado
   const { data: entryData, error: entryError } = await _supabase
     .from("time_entries")
     .select("employee_id, clock_in")
@@ -849,7 +869,6 @@ async function saveEditedEntry() {
     return;
   }
     
-  // 2. Calcular el total de horas de la semana EXCLUYENDO la entrada actual
   const weekStart = getWeekStart(clockInDate);
   const weekEnd = getWeekEnd(clockInDate);
 
@@ -875,7 +894,6 @@ async function saveEditedEntry() {
     });
   }
 
-  // 3. Calcular horas regulares y OT para ESTA entrada
   let regularHours = 0;
   let overtimeHours = 0;
   const safeWeekTotal = Math.max(0, weekTotalHoursBeforeThisEntry);
@@ -891,7 +909,6 @@ async function saveEditedEntry() {
   regularHours = Math.max(0, regularHours);
   overtimeHours = Math.max(0, overtimeHours);
 
-  // 4. Recalcular el pago
   const round = (num) => Math.round(num * 100) / 100;
   const totalHours = Number(shiftHours.toFixed(4));
   const regularPay = round(regularHours * employee.hourly_rate);
@@ -900,7 +917,6 @@ async function saveEditedEntry() {
   const taxes = round(grossPay * (employee.tax_percent / 100));
   const netPay = round(grossPay - taxes);
 
-  // 5. Actualizar la entrada
   const { error: updateError } = await _supabase
     .from("time_entries")
     .update({
@@ -925,7 +941,7 @@ async function saveEditedEntry() {
 
   alert("Entry updated successfully!");
   closeEditModal();
-  viewTimeEntries(); // Refrescar la tabla
+  viewTimeEntries();
 }
 </script>
 
@@ -960,6 +976,17 @@ async function saveEditedEntry() {
 <div id="adminActions"></div>
 
 <button onclick="closeAdminPanel()">Close</button>
+</div>
+
+<div id="manageEmployeesPanel" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 10000; overflow: auto; padding: 20px;">
+  <h2>Manage Employees</h2>
+  <button onclick="alert('New employee form coming soon!')">Create New Employee</button>
+  <hr>
+  <div id="employeeListContainer">
+    <!-- La lista de empleados se renderizará aquí -->
+  </div>
+  <br>
+  <button onclick="showAdminPanel(window.currentAdmin)">Back to Admin Panel</button>
 </div>
 
 <div id="editEntryModal" class="modal hidden">
