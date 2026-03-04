@@ -519,7 +519,8 @@ async function updateDashboardMetrics() {
     .from("time_entries")
     .select('*', { count: 'exact', head: true })
     .is("clock_out", null);
-  document.getElementById("metricClockedIn").innerText = clockedInError ? 'E' : clockedInCount;
+  if(clockedInError) console.error("Dashboard metric error (clockedIn):", clockedInError);
+  document.getElementById("metricClockedIn").innerText = clockedInError ? 'Error' : clockedInCount;
 
   // 2. Total hours today
   const now = new Date();
@@ -531,12 +532,13 @@ async function updateDashboardMetrics() {
     .select("total_hours")
     .gte("clock_in", startOfDay.toISOString())
     .lte("clock_in", endOfDay.toISOString());
-
+  
+  if(todayError) console.error("Dashboard metric error (hoursToday):", todayError);
   let totalHoursToday = 0;
   if (todayEntries) {
     totalHoursToday = todayEntries.reduce((sum, entry) => sum + (entry.total_hours || 0), 0);
   }
-  document.getElementById("metricHoursToday").innerText = todayError ? 'E' : totalHoursToday.toFixed(2);
+  document.getElementById("metricHoursToday").innerText = todayError ? 'Error' : totalHoursToday.toFixed(2);
 
   // 3. Weekly payroll total
   const weekStart = getWeekStart(new Date()).toISOString();
@@ -545,11 +547,12 @@ async function updateDashboardMetrics() {
     .select("gross_pay")
     .gte("clock_in", weekStart);
 
+  if(weekError) console.error("Dashboard metric error (weeklyPayroll):", weekError);
   let weeklyPayroll = 0;
   if (weekEntries) {
     weeklyPayroll = weekEntries.reduce((sum, entry) => sum + (entry.gross_pay || 0), 0);
   }
-  document.getElementById("metricWeeklyPayroll").innerText = weekError ? 'E' : `$${(weeklyPayroll || 0).toFixed(2)}`;
+  document.getElementById("metricWeeklyPayroll").innerText = weekError ? 'Error' : `$${(weeklyPayroll || 0).toFixed(2)}`;
 }
 
 function showAdminPanel(admin) {
@@ -816,7 +819,8 @@ async function saveEditedEntry() {
     .single();
 
   if (entryError) {
-    alert("Failed to load entry data.");
+    console.error("Save Error (loading entry):", entryError);
+    alert("Failed to load entry data: " + entryError.message);
     return;
   }
 
@@ -827,7 +831,8 @@ async function saveEditedEntry() {
     .single();
 
   if (empError) {
-    alert("Failed to load employee data.");
+    console.error("Save Error (loading employee):", empError);
+    alert("Failed to load employee data: " + empError.message);
     return;
   }
     
@@ -843,7 +848,8 @@ async function saveEditedEntry() {
     .lte("clock_in", weekEnd.toISOString());
 
   if (weekEntriesError) {
-      alert("Could not calculate weekly hours. Aborting save.");
+      console.error("Save Error (calculating weekly hours):", weekEntriesError);
+      alert("Could not calculate weekly hours: " + weekEntriesError.message);
       return;
   }
 
@@ -899,6 +905,7 @@ async function saveEditedEntry() {
     .eq("id", editingEntryId);
 
   if (updateError) {
+    console.error("Supabase update error:", updateError);
     alert("Error saving changes: " + updateError.message);
     return;
   }
