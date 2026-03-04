@@ -247,7 +247,16 @@ function getWeekStart(date) {
   const diff = d.getDate() - day;
   const weekStart = new Date(d.setDate(diff));
   weekStart.setHours(0,0,0,0);
-  return weekStart.toISOString();
+  return weekStart;
+}
+
+function getWeekEnd(date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + 6;
+    const weekEnd = new Date(d.setDate(diff));
+    weekEnd.setHours(23, 59, 59, 999);
+    return weekEnd;
 }
 
 // Normaliza timestamps que vienen de la base (con o sin zona horaria)
@@ -395,7 +404,7 @@ async function clockOut() {
     return;
   }
 
-  const weekStart = getWeekStart(now);
+  const weekStart = getWeekStart(now).toISOString();
   const { data: weekEntries } = await _supabase.from("time_entries").select("regular_hours, overtime_hours, clock_out").eq("employee_id", empId).gte("clock_in", weekStart);
 
   let weekTotal = 0;
@@ -530,7 +539,7 @@ async function updateDashboardMetrics() {
   document.getElementById("metricHoursToday").innerText = todayError ? 'E' : totalHoursToday.toFixed(2);
 
   // 3. Weekly payroll total
-  const weekStart = getWeekStart(new Date());
+  const weekStart = getWeekStart(new Date()).toISOString();
   const { data: weekEntries, error: weekError } = await _supabase
     .from("time_entries")
     .select("gross_pay")
@@ -659,7 +668,7 @@ async function adminCloseEntry(entryId) {
     shiftHours
   });
 
-  const weekStart = getWeekStart(now);
+  const weekStart = getWeekStart(now).toISOString();
   const { data: weekEntries } = await _supabase
     .from("time_entries")
     .select("regular_hours, overtime_hours, clock_out")
@@ -781,7 +790,7 @@ async function saveEditedEntry() {
   const newClockOut = document.getElementById("editClockOut").value;
 
   if (!newClockIn || !newClockOut) {
-    alert("Both times required");
+    alert("Both times are required.");
     return;
   }
 
@@ -789,28 +798,81 @@ async function saveEditedEntry() {
   const clockOutDate = new Date(newClockOut);
 
   if (clockOutDate <= clockInDate) {
-    alert("Clock out must be after clock in");
+    alert("Clock out must be after clock in.");
     return;
   }
 
   const shiftHours = (clockOutDate - clockInDate) / 3600000;
+  if (shiftHours <= 0 || shiftHours > 24) {
+      alert("Shift duration must be between 0 and 24 hours.");
+      return;
+  }
 
-  // Obtener empleado
-  const { data: entryData } = await _supabase
+  // 1. Obtener la entrada y el empleado
+  const { data: entryData, error: entryError } = await _supabase
     .from("time_entries")
-    .select("employee_id")
+    .select("employee_id, clock_in")
     .eq("id", editingEntryId)
     .single();
 
-  const { data: employee } = await _supabase
+  if (entryError) {
+    alert("Failed to load entry data.");
+    return;
+  }
+
+  const { data: employee, error: empError } = await _supabase
     .from("employees")
     .select("hourly_rate, overtime_multiplier, tax_percent")
     .eq("employee_id", entryData.employee_id)
     .single();
 
-  const regularHours = Math.min(shiftHours, 40);
-  const overtimeHours = Math.max(shiftHours - 40, 0);
+  if (empError) {
+    alert("Failed to load employee data.");
+    return;
+  }
+    
+  // 2. Calcular el total de horas de la semana EXCLUYENDO la entrada actual
+  const weekStart = getWeekStart(clockInDate);
+  const weekEnd = getWeekEnd(clockInDate);
 
+  const { data: weekEntries, error: weekEntriesError } = await _supabase
+    .from("time_entries")
+    .select("regular_hours, overtime_hours, id")
+    .eq("employee_id", entryData.employee_id)
+    .gte("clock_in", weekStart.toISOString())
+    .lte("clock_in", weekEnd.toISOString());
+
+  if (weekEntriesError) {
+      alert("Could not calculate weekly hours. Aborting save.");
+      return;
+  }
+
+  let weekTotalHoursBeforeThisEntry = 0;
+  if (weekEntries) {
+    weekEntries.forEach(e => {
+      if (e.id !== editingEntryId) {
+          weekTotalHoursBeforeThisEntry += (Number(e.regular_hours) || 0) + (Number(e.overtime_hours) || 0);
+      }
+    });
+  }
+
+  // 3. Calcular horas regulares y OT para ESTA entrada
+  let regularHours = 0;
+  let overtimeHours = 0;
+  const safeWeekTotal = Math.max(0, weekTotalHoursBeforeThisEntry);
+
+  if (safeWeekTotal >= 40) {
+    overtimeHours = shiftHours;
+  } else if (safeWeekTotal + shiftHours <= 40) {
+    regularHours = shiftHours;
+  } else {
+    regularHours = 40 - safeWeekTotal;
+    overtimeHours = shiftHours - regularHours;
+  }
+  regularHours = Math.max(0, regularHours);
+  overtimeHours = Math.max(0, overtimeHours);
+
+  // 4. Recalcular el pago
   const round = (num) => Math.round(num * 100) / 100;
   const totalHours = Number(shiftHours.toFixed(4));
   const regularPay = round(regularHours * employee.hourly_rate);
@@ -819,7 +881,8 @@ async function saveEditedEntry() {
   const taxes = round(grossPay * (employee.tax_percent / 100));
   const netPay = round(grossPay - taxes);
 
-  const { error } = await _supabase
+  // 5. Actualizar la entrada
+  const { error: updateError } = await _supabase
     .from("time_entries")
     .update({
       clock_in: clockInDate.toISOString(),
@@ -835,13 +898,14 @@ async function saveEditedEntry() {
     })
     .eq("id", editingEntryId);
 
-  if (error) {
-    alert("Error saving changes");
+  if (updateError) {
+    alert("Error saving changes: " + updateError.message);
     return;
   }
 
+  alert("Entry updated successfully!");
   closeEditModal();
-  viewTimeEntries();
+  viewTimeEntries(); // Refrescar la tabla
 }
 </script>
 
