@@ -28,11 +28,7 @@
     }
 
     async function syncOfflineEntries() {
-      if (typeof _supabase === "undefined") {
-        console.warn("Supabase not ready yet, will sync later.");
-        return;
-      }
-
+      if (typeof _supabase === "undefined") { return; }
       let pending = JSON.parse(localStorage.getItem("pendingEntries")) || [];
       if (pending.length === 0) return;
       let remaining = [];
@@ -67,124 +63,26 @@
       --error-soft: #fff5f5;
       --error-text: #cc8a27;
     }
-
-    body {
-      margin: 0;
-      font-family: 'Inter', -apple-system, sans-serif;
-      background-color: var(--bg-color);
-      color: var(--text-main);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      overflow: hidden;
-      user-select: none;
-      touch-action: manipulation;
-    }
-
-    #mainCard {
-      background: var(--card-bg);
-      width: 90%;
-      max-width: 450px;
-      padding: 3rem 2rem;
-      border-radius: 24px;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.05);
-      text-align: center;
-    }
-
+    body { margin: 0; font-family: 'Inter', -apple-system, sans-serif; background-color: var(--bg-color); color: var(--text-main); display: flex; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; user-select: none; touch-action: manipulation; }
+    #mainCard { background: var(--card-bg); width: 90%; max-width: 450px; padding: 3rem 2rem; border-radius: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.05); text-align: center; }
     #clockContainer { margin-bottom: 2.5rem; }
-
-    #date {
-      font-size: 1.1rem;
-      color: var(--text-muted);
-      margin-bottom: 0.5rem;
-      font-weight: 500;
-    }
-
-    #clock {
-      font-size: 3.5rem;
-      font-weight: 700;
-      color: var(--primary);
-      font-variant-numeric: tabular-nums;
-    }
-
+    #date { font-size: 1.1rem; color: var(--text-muted); margin-bottom: 0.5rem; font-weight: 500; }
+    #clock { font-size: 3.5rem; font-weight: 700; color: var(--primary); font-variant-numeric: tabular-nums; }
     .input-group { margin-bottom: 2rem; }
-
-    label {
-      display: block;
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 0.8rem;
-    }
-
-    input#empId {
-      width: 100%;
-      padding: 1rem;
-      font-size: 2rem;
-      border: 2px solid var(--border);
-      border-radius: 16px;
-      text-align: center;
-      background: #fdfdfd;
-      transition: all 0.2s;
-      box-sizing: border-box;
-      outline: none;
-    }
-
-    input#empId:focus {
-      border-color: var(--primary);
-      background: #fff;
-      box-shadow: 0 0 0 4px rgba(74, 105, 189, 0.1);
-    }
-
-    .button-group {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
-    }
-
-    button {
-      padding: 1.2rem;
-      font-size: 1.1rem;
-      font-weight: 600;
-      border: none;
-      border-radius: 14px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
+    label { display: block; font-size: 0.9rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.8rem; }
+    input#empId { width: 100%; padding: 1rem; font-size: 2rem; border: 2px solid var(--border); border-radius: 16px; text-align: center; background: #fdfdfd; transition: all 0.2s; box-sizing: border-box; outline: none; }
+    input#empId:focus { border-color: var(--primary); background: #fff; box-shadow: 0 0 0 4px rgba(74, 105, 189, 0.1); }
+    .button-group { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    button { padding: 1.2rem; font-size: 1.1rem; font-weight: 600; border: none; border-radius: 14px; cursor: pointer; transition: all 0.2s; }
     button[onclick="clockIn()"] { background-color: #eb8e55; color: white; border: 1px solid var(--border); }
     button[onclick="clockOut()"] { background-color: var(--primary); color: white; }
-
-    #msg {
-      margin-top: 2rem;
-      font-size: 1rem;
-      min-height: 50px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 12px;
-      font-weight: 500;
-    }
-
+    #msg { margin-top: 2rem; font-size: 1rem; min-height: 50px; display: flex; align-items: center; justify-content: center; border-radius: 12px; font-weight: 500; }
     .msg-success { background: var(--success-soft); color: var(--success-text); }
     .msg-error { background: var(--error-soft); color: var(--error-text); }
-
-    .modal {
-      position: fixed;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.6);
-      display: flex; justify-content: center; align-items: center;
-      z-index: 10000;
-    }
-
+    .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 10000; }
     .modal-content { background: white; padding: 20px; border-radius: 8px; text-align: center; }
     .hidden { display: none !important; }
-
-    input[type=number]::-webkit-outer-spin-button,
-    input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   </style>
 </head>
 <body>
@@ -194,33 +92,21 @@
       <div id="date"></div>
       <div id="clock"></div>
     </div>
-
     <div class="input-group">
       <label>Employee ID</label>
-      <input id="empId" type="number" placeholder="0000" min="0" max="9999" step="1" inputmode="numeric"
-      pattern="[0-9]*" oninput="if(this.value.length > 4) this.value = this.value.slice(0,4);">
+      <input id="empId" type="number" placeholder="0000" min="0" max="9999" step="1" inputmode="numeric" pattern="[0-9]*" oninput="if(this.value.length > 4) this.value = this.value.slice(0,4);">
     </div>
-
     <div class="button-group">
       <button onclick="clockIn()">Clock In</button>
       <button onclick="clockOut()">Clock Out</button>
     </div>
-
     <p id="msg"></p>
   </div>
 
 <script>
-const _supabase = supabase.createClient(
-  "https://jqppakaodpgbtxzpvsti.supabase.co",
-  "sb_publishable_ZwLCHMtM9uCfBFkwBcSSEQ_zQVq1RwI"
-);
+const _supabase = supabase.createClient("https://jqppakaodpgbtxzpvsti.supabase.co", "sb_publishable_ZwLCHMtM9uCfBFkwBcSSEQ_zQVq1RwI");
 
-if (typeof syncOfflineEntries === "function") {
-  syncOfflineEntries();
-}
-
-let editingEntryId = null;
-let editingEmployeeId = null;
+if (typeof syncOfflineEntries === "function") { syncOfflineEntries(); }
 
 function updateClock() {
   const now = new Date();
@@ -249,26 +135,12 @@ function getWeekStart(date) {
   return weekStart;
 }
 
-function getWeekEnd(date) {
-    const d = new Date(date);
-    const day = d.getDay();
-    const diff = d.getDate() - day + 6;
-    const weekEnd = new Date(d.setDate(diff));
-    weekEnd.setHours(23, 59, 59, 999);
-    return weekEnd;
-}
-
 function parseDbTimestamp(value) {
   if (!value) return null;
   if (value instanceof Date) return value;
   let s = String(value).trim();
-  if (!s) return null;
-  if (!s.includes("T")) {
-    s = s.replace(" ", "T");
-  }
-  if (!/[zZ]|[+-]\d\d:?\d\d$/.test(s)) {
-    s += "Z";
-  }
+  if (!s.includes("T")) { s = s.replace(" ", "T"); }
+  if (!/[zZ]|[+-]\\d\\d:?\\d\\d$/.test(s)) { s += "Z"; }
   const d = new Date(s);
   return isNaN(d.getTime()) ? null : d;
 }
@@ -277,66 +149,21 @@ async function clockIn() {
   const empId = document.getElementById("empId").value.trim();
   if (empId === "9999") { clearInput(); openAdmin(); return; }
   if (!empId) return alert("Enter ID");
-  
   const msg = document.getElementById("msg");
-  msg.className = ""; 
-
+  msg.className = "";
   const exists = await employeeExists(empId);
-  if (!exists) {
-    msg.innerText = "Employee not found";
-    msg.classList.add("msg-error");
-    return;
-  }
-
+  if (!exists) { msg.innerText = "Employee not found"; msg.classList.add("msg-error"); return; }
   const { data: openEntry } = await _supabase.from("time_entries").select("id").eq("employee_id", empId).is("clock_out", null).maybeSingle();
-  if (openEntry) {
-    msg.innerText = "Already checked in";
-    msg.classList.add("msg-error");
-    return;
-  }
-
+  if (openEntry) { msg.innerText = "Already checked in"; msg.classList.add("msg-error"); return; }
   const now = new Date();
-  const entry = {
-    employee_id: empId,
-    clock_in: now.toISOString(),
-    clock_in_local: now.toLocaleString("en-US", { timeZone: "America/New_York" })
-  };
-
-  try {
-    localStorage.setItem(`clockIn_${empId}`, now.toISOString());
-  } catch (e) {
-    console.warn("No se pudo guardar clockIn en localStorage", e);
-  }
-
-  if (!isOnline()) {
-    saveOfflineEntry(entry);
-    msg.innerText = "Saved offline";
-    clearInput();
-    return;
-  }
-
-const { data: employee, error: empError } = await _supabase
-  .from("employees")
-  .select("*")
-  .eq("employee_id", entry.employee_id)
-  .eq("active", true)
-  .single();
-
-if (empError || !employee) {
-  msg.innerText = "Invalid or inactive employee ID";
-  msg.classList.add("msg-error");
-  return;
-}
-
+  const entry = { employee_id: empId, clock_in: now.toISOString(), clock_in_local: now.toLocaleString("en-US", { timeZone: "America/New_York" }) };
+  try { localStorage.setItem(`clockIn_$\{empId}`, now.toISOString()); } catch (e) { console.warn("No se pudo guardar clockIn en localStorage", e); }
+  if (!isOnline()) { saveOfflineEntry(entry); msg.innerText = "Saved offline"; clearInput(); return; }
+  const { data: employee, error: empError } = await _supabase.from("employees").select("*").eq("employee_id", entry.employee_id).eq("active", true).single();
+  if (empError || !employee) { msg.innerText = "Invalid or inactive employee ID"; msg.classList.add("msg-error"); return; }
   const { error } = await _supabase.from("time_entries").insert([entry]);
-  if (error) {
-    msg.innerText = error.message;
-    msg.classList.add("msg-error");
-  } else {
-    msg.innerText = "Checked In Successfully";
-    msg.classList.add("msg-success");
-    clearInput();
-  }
+  if (error) { msg.innerText = error.message; msg.classList.add("msg-error"); } 
+  else { msg.innerText = "Checked In Successfully"; msg.classList.add("msg-success"); clearInput(); }
 }
 
 async function clockOut() {
@@ -344,135 +171,50 @@ async function clockOut() {
   if (!empId) return alert("Enter ID");
   const msg = document.getElementById("msg");
   msg.className = "";
-
   const exists = await employeeExists(empId);
-  if (!exists) {
-    msg.innerText = "Employee not found";
-    msg.classList.add("msg-error");
-    return;
-  }
-
+  if (!exists) { msg.innerText = "Employee not found"; msg.classList.add("msg-error"); return; }
   const { data: openEntry } = await _supabase.from("time_entries").select("id, clock_in").eq("employee_id", empId).is("clock_out", null).maybeSingle();
-
-  if (!openEntry) {
-    msg.innerText = "No active check-in";
-    msg.classList.add("msg-error");
-    return;
-  }
-
+  if (!openEntry) { msg.innerText = "No active check-in"; msg.classList.add("msg-error"); return; }
   const now = new Date();
   const clockOutISO = now.toISOString();
   const clockOutLocalStr = now.toLocaleString("en-US", { timeZone: "America/New_York" });
-  
   let clockInTime = null;
-  try {
-    const stored = localStorage.getItem(`clockIn_${empId}`);
-    if (stored) {
-      clockInTime = new Date(stored);
-    }
-  } catch (e) {
-    console.warn("No se pudo leer clockIn de localStorage", e);
-  }
-  if (!clockInTime && openEntry.clock_in) {
-    clockInTime = parseDbTimestamp(openEntry.clock_in);
-  }
-  if (!clockInTime) {
-    msg.innerText = "No se puede calcular el turno. Pida al administrador que ajuste la entrada.";
-    msg.classList.add("msg-error");
-    return;
-  }
-
+  try { const stored = localStorage.getItem(`clockIn_$\{empId}`); if (stored) { clockInTime = new Date(stored); } } catch (e) { console.warn("No se pudo leer clockIn de localStorage", e); }
+  if (!clockInTime && openEntry.clock_in) { clockInTime = parseDbTimestamp(openEntry.clock_in); }
+  if (!clockInTime) { msg.innerText = "No se puede calcular el turno. Pida al administrador que ajuste la entrada."; msg.classList.add("msg-error"); return; }
   let shiftHours = (now - clockInTime) / 3600000;
-
-  if (shiftHours < 0) {
-    shiftHours = 0;
-  }
-  if (shiftHours > 24) {
-    msg.innerText = "Turno mayor a 24 horas. Cierre desde el panel de administración.";
-    msg.classList.add("msg-error");
-    return;
-  }
-
+  if (shiftHours < 0) { shiftHours = 0; }
+  if (shiftHours > 24) { msg.innerText = "Turno mayor a 24 horas. Cierre desde el panel de administración."; msg.classList.add("msg-error"); return; }
   const weekStart = getWeekStart(now).toISOString();
   const { data: weekEntries } = await _supabase.from("time_entries").select("regular_hours, overtime_hours, clock_out").eq("employee_id", empId).gte("clock_in", weekStart);
-
   let weekTotal = 0;
-  if (weekEntries) {
-    weekEntries.forEach(e => {
-      if (e.clock_out) {
-        weekTotal += Number(e.regular_hours || 0);
-        weekTotal += Number(e.overtime_hours || 0);
-      }
-    });
-  }
-
-  let regularHours = 0;
-  let overtimeHours = 0;
+  if (weekEntries) { weekEntries.forEach(e => { if (e.clock_out) { weekTotal += Number(e.regular_hours || 0); weekTotal += Number(e.overtime_hours || 0); } }); }
+  let regularHours = 0, overtimeHours = 0;
   const safeWeekTotal = Math.max(0, weekTotal);
-  if (safeWeekTotal >= 40) {
-    overtimeHours = shiftHours;
-  } else if (safeWeekTotal + shiftHours <= 40) {
-    regularHours = shiftHours;
-  } else {
-    regularHours = 40 - safeWeekTotal;
-    overtimeHours = shiftHours - regularHours;
-  }
+  if (safeWeekTotal >= 40) { overtimeHours = shiftHours; } else if (safeWeekTotal + shiftHours <= 40) { regularHours = shiftHours; } else { regularHours = 40 - safeWeekTotal; overtimeHours = shiftHours - regularHours; }
   regularHours = Math.max(0, regularHours);
   overtimeHours = Math.max(0, overtimeHours);
-
   const { data: employee } = await _supabase.from("employees").select("hourly_rate, overtime_multiplier, tax_percent").eq("employee_id", empId).single();
-
   const round = (num) => Math.round(num * 100) / 100;
   const regularPay = round(regularHours * employee.hourly_rate);
   const overtimePay = round(overtimeHours * employee.hourly_rate * employee.overtime_multiplier);
   const grossPay = round(regularPay + overtimePay);
   const taxes = round(grossPay * (employee.tax_percent / 100));
   const netPay = round(grossPay - taxes);
-
-  const { error } = await _supabase.from("time_entries").update({
-    clock_out: clockOutISO,
-    clock_out_local: clockOutLocalStr,
-    total_hours: Number(shiftHours.toFixed(4)),
-    regular_hours: Number(regularHours.toFixed(4)),
-    overtime_hours: Number(overtimeHours.toFixed(4)),
-    regular_pay: regularPay,
-    overtime_pay: overtimePay,
-    gross_pay: grossPay,
-    taxes: taxes,
-    net_pay: netPay
-  }).eq("id", openEntry.id);
-
-  if (error) {
-    msg.innerText = error.message;
-    msg.classList.add("msg-error");
-  } else {
-    try { localStorage.removeItem(`clockIn_${empId}`); } catch (e) {}
-    msg.innerText = `Out: ${regularHours.toFixed(2)} reg / ${overtimeHours.toFixed(2)} OT`;
-    msg.classList.add("msg-success");
-    clearInput();
-  }
+  const { error } = await _supabase.from("time_entries").update({ clock_out: clockOutISO, clock_out_local: clockOutLocalStr, total_hours: Number(shiftHours.toFixed(4)), regular_hours: Number(regularHours.toFixed(4)), overtime_hours: Number(overtimeHours.toFixed(4)), regular_pay: regularPay, overtime_pay: overtimePay, gross_pay: grossPay, taxes: taxes, net_pay: netPay }).eq("id", openEntry.id);
+  if (error) { msg.innerText = error.message; msg.classList.add("msg-error"); } else { try { localStorage.removeItem(`clockIn_$\{empId}`); } catch (e) {} msg.innerText = `Out: $\{regularHours.toFixed(2)} reg / $\{overtimeHours.toFixed(2)} OT`; msg.classList.add("msg-success"); clearInput(); }
 }
 
 let wakeLock = null;
-async function keepScreenOn() {
-  try {
-    if ('wakeLock' in navigator) {
-      wakeLock = await navigator.wakeLock.request('screen');
-    }
-  } catch (err) { console.log("Wake lock error:", err); }
-}
+async function keepScreenOn() { try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); } } catch (err) { console.log("Wake lock error:", err); } }
 window.addEventListener('load', keepScreenOn);
-document.addEventListener('visibilitychange', () => {
-  if (wakeLock !== null && document.visibilityState === 'visible') keepScreenOn();
-});
+document.addEventListener('visibilitychange', () => { if (wakeLock !== null && document.visibilityState === 'visible') keepScreenOn(); });
 
 // ADMIN LOGIC
 let pressTimer = null;
 const clockElement = document.getElementById("clock");
-
 function startPress() { pressTimer = setTimeout(openAdmin, 3000); }
 function cancelPress() { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } }
-
 clockElement.addEventListener("touchstart", startPress);
 clockElement.addEventListener("touchend", cancelPress);
 clockElement.addEventListener("mousedown", startPress);
@@ -491,587 +233,10 @@ function closeAdminModal() {
 async function validateAdmin() {
   const pin = document.getElementById("adminPinInput").value.trim();
   const { data, error } = await _supabase.from("admins").select("*").eq("pin", pin).eq("active", true).single();
-
   if (error || !data) { alert("Wrong PIN"); return; }
-  window.currentAdmin = data;
-  closeAdminModal();
-  showAdminPanel(data);
-}
-
-async function updateDashboardMetrics() {
-  document.getElementById("metricHoursToday").innerText = "...";
-  document.getElementById("metricClockedIn").innerText = "...";
-  document.getElementById("metricWeeklyPayroll").innerText = "...";
-
-  const { count: clockedInCount, error: clockedInError } = await _supabase
-    .from("time_entries")
-    .select('*', { count: 'exact', head: true })
-    .is("clock_out", null);
-  if(clockedInError) console.error("Dashboard metric error (clockedIn):", clockedInError);
-  document.getElementById("metricClockedIn").innerText = clockedInError ? 'Error' : clockedInCount;
-
-  const now = new Date();
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-  const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-
-  const { data: todayEntries, error: todayError } = await _supabase
-    .from("time_entries")
-    .select("total_hours")
-    .gte("clock_in", startOfDay.toISOString())
-    .lte("clock_in", endOfDay.toISOString());
-  
-  if(todayError) console.error("Dashboard metric error (hoursToday):", todayError);
-  let totalHoursToday = 0;
-  if (todayEntries) {
-    totalHoursToday = todayEntries.reduce((sum, entry) => sum + (entry.total_hours || 0), 0);
-  }
-  document.getElementById("metricHoursToday").innerText = todayError ? 'Error' : totalHoursToday.toFixed(2);
-
-  const weekStart = getWeekStart(new Date()).toISOString();
-  const { data: weekEntries, error: weekError } = await _supabase
-    .from("time_entries")
-    .select("gross_pay")
-    .gte("clock_in", weekStart);
-
-  if(weekError) console.error("Dashboard metric error (weeklyPayroll):", weekError);
-  let weeklyPayroll = 0;
-  if (weekEntries) {
-    weeklyPayroll = weekEntries.reduce((sum, entry) => sum + (entry.gross_pay || 0), 0);
-  }
-  document.getElementById("metricWeeklyPayroll").innerText = weekError ? 'Error' : `$${(weeklyPayroll || 0).toFixed(2)}`;
-}
-
-function showAdminPanel(admin) {
-  window.currentAdmin = admin;
-
-  document.getElementById("mainCard").style.display = "none";
-  document.getElementById("manageEmployeesPanel").classList.add("hidden");
-  document.getElementById("adminPanel").classList.remove("hidden");
-
-  updateDashboardMetrics();
-
-  document.getElementById("adminInfo").innerText =
-    "Welcome " + admin.name + " (" + admin.role + ")";
-
-  const actions = document.getElementById("adminActions");
-  actions.innerHTML = "";
-
-  if (admin.role === "owner" || admin.role === "manager") {
-    actions.innerHTML += `<button onclick="manageEmployees()">Manage Employees</button><br><br>`;
-    actions.innerHTML += `<button onclick="viewTimeEntries()">View Time Entries</button><br><br>`;
-    actions.innerHTML += `<button onclick="exportReport()">Export Report</button><br><br>`;
-  }
-  if (admin.role === "owner") {
-    actions.innerHTML += `<button onclick="createAdmin()">Create Admin</button><br><br>`;
-  }
-}
-
-async function manageEmployees() {
-  document.getElementById("adminPanel").classList.add("hidden");
-  document.getElementById("manageEmployeesPanel").classList.remove("hidden");
-  document.getElementById("newEmployeeFormContainer").classList.add("hidden");
-  document.getElementById("editEmployeeFormContainer").classList.add("hidden");
-  document.getElementById("employeeListContainer").classList.remove("hidden");
-  await renderEmployeeList();
-}
-
-async function renderEmployeeList() {
-    const container = document.getElementById("employeeListContainer");
-    container.innerHTML = "<h3>Loading employees...</h3>";
-
-    const { data, error } = await _supabase
-      .from("employees")
-      .select("*")
-      .order("employee_id", { ascending: true });
-
-    if (error) {
-      container.innerHTML = "Error loading employees.";
-      return;
-    }
-
-    let html = "<h3>Current Employees</h3>";
-    html += "<table border='1' style='width:100%; font-size:12px; border-collapse: collapse;'>";
-    html += `
-      <tr style="text-align: left;">
-          <th>ID</th>
-          <th>Name</th>
-          <th>Rate</th>
-          <th>Status</th>
-          <th>Action</th>
-      </tr>`;
-
-    data.forEach(emp => {
-      const status = emp.active ? "Active" : "Inactive";
-      html += `
-        <tr style="border-top: 1px solid #ccc;">
-          <td style="padding: 4px;">${emp.employee_id}</td>
-          <td style="padding: 4px;">${emp.name}</td>
-          <td style="padding: 4px;">$${emp.hourly_rate}/hr</td>
-          <td style="padding: 4px;">${status}</td>
-          <td style="padding: 4px;">
-            <button onclick="openEditEmployeeForm(${emp.id})">Edit</button>
-          </td>
-        </tr>
-      `;
-    });
-
-    html += "</table><br>";
-    container.innerHTML = html;
-}
-
-function showNewEmployeeForm() {
-  document.getElementById("employeeListContainer").classList.add("hidden");
-  document.getElementById("editEmployeeFormContainer").classList.add("hidden");
-  document.getElementById("newEmployeeFormContainer").classList.remove("hidden");
-  document.getElementById("newEmpId").value = "";
-  document.getElementById("newEmpName").value = "";
-  document.getElementById("newEmpRate").value = "";
-  document.getElementById("newEmpPin").value = "";
-}
-
-function cancelNewEmployee() {
-  document.getElementById("newEmployeeFormContainer").classList.add("hidden");
-  document.getElementById("employeeListContainer").classList.remove("hidden");
-}
-
-async function saveNewEmployee() {
-  const empId = document.getElementById("newEmpId").value.trim();
-  const name = document.getElementById("newEmpName").value.trim();
-  const rate = document.getElementById("newEmpRate").value.trim();
-  const pin = document.getElementById("newEmpPin").value.trim();
-
-  if (!empId || !name || !rate || !pin) {
-    alert("All fields are required.");
-    return;
-  }
-
-  if (isNaN(rate) || parseFloat(rate) <= 0) {
-    alert("Hourly rate must be a positive number.");
-    return;
-  }
-
-  if (!/^\d{4}$/.test(pin)) {
-      alert("PIN must be 4 digits.");
-      return;
-  }
-
-  const { data, error } = await _supabase
-    .from("employees")
-    .insert([{ 
-      employee_id: empId, 
-      name: name, 
-      hourly_rate: parseFloat(rate),
-      pin: pin
-    }]);
-
-  if (error) {
-    alert("Error creating employee: " + error.message);
-  } else {
-    alert("Employee created successfully!");
-    cancelNewEmployee();
-    renderEmployeeList();
-  }
-}
-
-async function openEditEmployeeForm(employeeId) {
-  editingEmployeeId = employeeId;
-  
-  const { data, error } = await _supabase
-    .from("employees")
-    .select("*")
-    .eq("id", employeeId)
-    .single();
-
-  if (error) {
-    alert("Error fetching employee data.");
-    return;
-  }
-
-  document.getElementById("editEmpId").value = data.employee_id;
-  document.getElementById("editEmpName").value = data.name;
-  document.getElementById("editEmpRate").value = data.hourly_rate;
-  document.getElementById("editEmpActive").checked = data.active;
-  document.getElementById("editEmpPin").value = ""; // Clear PIN for security
-
-  document.getElementById("employeeListContainer").classList.add("hidden");
-  document.getElementById("newEmployeeFormContainer").classList.add("hidden");
-  document.getElementById("editEmployeeFormContainer").classList.remove("hidden");
-}
-
-function cancelEditEmployee() {
-  editingEmployeeId = null;
-  document.getElementById("editEmployeeFormContainer").classList.add("hidden");
-  document.getElementById("employeeListContainer").classList.remove("hidden");
-}
-
-async function saveEditedEmployee() {
-  if (!editingEmployeeId) return;
-
-  const name = document.getElementById("editEmpName").value.trim();
-  const rate = document.getElementById("editEmpRate").value.trim();
-  const pin = document.getElementById("editEmpPin").value.trim();
-  const active = document.getElementById("editEmpActive").checked;
-
-  if (!name || !rate) {
-    alert("Name and Hourly Rate are required.");
-    return;
-  }
-
-  let updateData = {
-    name: name,
-    hourly_rate: parseFloat(rate),
-    active: active
-  };
-
-  if (pin) {
-    if (!/^\d{4}$/.test(pin)) {
-      alert("If changing PIN, it must be 4 digits.");
-      return;
-    }
-    updateData.pin = pin;
-  }
-
-  const { error } = await _supabase
-    .from("employees")
-    .update(updateData)
-    .eq("id", editingEmployeeId);
-
-  if (error) {
-    alert("Error updating employee: " + error.message);
-  } else {
-    alert("Employee updated successfully!");
-    cancelEditEmployee();
-    renderEmployeeList();
-  }
-}
-
-
-async function viewTimeEntries() {
-  const actions = document.getElementById("adminActions");
-
-  actions.innerHTML = "<h3>Loading time entries...</h3>";
-
-  const { data, error } = await _supabase
-    .from("time_entries")
-    .select("*")
-    .order("clock_in", { ascending: false })
-    .limit(50);
-
-  if (error) {
-    actions.innerHTML = "Error loading entries";
-    return;
-  }
-
-  let html = "<h3>Recent Time Entries</h3>";
-  html += "<table border='1' style='width:100%; font-size:12px; border-collapse: collapse;'>";
-  html += `
-    <tr style="text-align: left;">
-        <th>Employee</th>
-        <th>Clock In</th>
-        <th>Clock Out</th>
-        <th>Regular</th>
-        <th>Overtime</th>
-        <th>Gross Pay</th>
-        <th>Action</th>
-    </tr>`;  
-
- data.forEach(entry => {
-  let clockOutDisplay = entry.clock_out
-    ? parseDbTimestamp(entry.clock_out)?.toLocaleString() || "INVALID"
-    : "OPEN";
-
-  let actionButton = `<button onclick="openEditEntry('${entry.id}')">Edit</button>`;
-  if (!entry.clock_out) {
-    actionButton += ` <button onclick="adminCloseEntry('${entry.id}')">Close</button>`;
-  }
-
-  const regHours = entry.regular_hours ? Number(entry.regular_hours).toFixed(2) : '-';
-  const otHours = entry.overtime_hours ? Number(entry.overtime_hours).toFixed(2) : '-';
-  const grossPay = entry.gross_pay ? `$${Number(entry.gross_pay).toFixed(2)}` : '-';
-
-  html += `
-    <tr style="border-top: 1px solid #ccc;">
-      <td style="padding: 4px;">${entry.employee_id}</td>
-      <td style="padding: 4px;">${parseDbTimestamp(entry.clock_in)?.toLocaleString() || "INVALID"}</td>
-      <td style="padding: 4px;">${clockOutDisplay}</td>
-      <td style="padding: 4px;">${regHours}</td>
-      <td style="padding: 4px;">${otHours}</td>
-      <td style="padding: 4px;">${grossPay}</td>
-      <td style="padding: 4px;">${actionButton}</td>
-    </tr>
-  `;
-});
-
-  html += "</table><br>";
-  html += `<button onclick="showAdminPanel(window.currentAdmin)">Back</button>`;
-
-  actions.innerHTML = html;
-}
-
-
-async function adminCloseEntry(entryId) {
-
-  if (!confirm("Close this entry now?")) return;
-
-  const { data: entry, error: loadError } = await _supabase
-    .from("time_entries")
-    .select("id, employee_id, clock_in")
-    .eq("id", entryId)
-    .single();
-
-  if (loadError || !entry) {
-    alert("Error loading entry");
-    return;
-  }
-
-  const now = new Date();
-  const clockOutISO = now.toISOString();
-  const clockOutLocalStr = now.toLocaleString("en-US", { timeZone: "America/New_York" });
-
-  const clockInTime = parseDbTimestamp(entry.clock_in);
-  if (!clockInTime || now <= clockInTime) {
-    alert("Clock in time is invalid");
-    return;
-  }
-  const shiftHours = (now - clockInTime) / 3600000;
-
-  const weekStart = getWeekStart(now).toISOString();
-  const { data: weekEntries } = await _supabase
-    .from("time_entries")
-    .select("regular_hours, overtime_hours, clock_out")
-    .eq("employee_id", entry.employee_id)
-    .gte("clock_in", weekStart);
-
-  let weekTotal = 0;
-  if (weekEntries) {
-    weekEntries.forEach(e => {
-      if (e.clock_out) {
-        weekTotal += Number(e.regular_hours || 0);
-        weekTotal += Number(e.overtime_hours || 0);
-      }
-    });
-  }
-
-  let regularHours = 0;
-  let overtimeHours = 0;
-  if (weekTotal >= 40) {
-    overtimeHours = shiftHours;
-  } else if (weekTotal + shiftHours <= 40) {
-    regularHours = shiftHours;
-  } else {
-    regularHours = 40 - weekTotal;
-    overtimeHours = shiftHours - regularHours;
-  }
-
-  const { data: employee, error: empError } = await _supabase
-    .from("employees")
-    .select("hourly_rate, overtime_multiplier, tax_percent")
-    .eq("employee_id", entry.employee_id)
-    .single();
-
-  if (empError || !employee) {
-    alert("Error loading employee");
-    return;
-  }
-
-  const round = (num) => Math.round(num * 100) / 100;
-  const regularPay = round(regularHours * employee.hourly_rate);
-  const overtimePay = round(overtimeHours * employee.hourly_rate * employee.overtime_multiplier);
-  const grossPay = round(regularPay + overtimePay);
-  const taxes = round(grossPay * (employee.tax_percent / 100));
-  const netPay = round(grossPay - taxes);
-
-  const { error: updateError } = await _supabase
-    .from("time_entries")
-    .update({
-      clock_out: clockOutISO,
-      clock_out_local: clockOutLocalStr,
-      total_hours: Number(shiftHours.toFixed(4)),
-      regular_hours: Number(regularHours.toFixed(4)),
-      overtime_hours: Number(overtimeHours.toFixed(4)),
-      regular_pay: regularPay,
-      overtime_pay: overtimePay,
-      gross_pay: grossPay,
-      taxes: taxes,
-      net_pay: netPay
-    })
-    .eq("id", entry.id);
-
-  if (updateError) {
-    alert("Error closing entry");
-    return;
-  }
-
-  alert("Entry closed successfully");
-  viewTimeEntries();
-}
-
-function exportReport() {
-  alert("Export system coming next");
-}
-
-function createAdmin() {
-  alert("Create Admin panel coming next");
-}
-
-function closeAdminPanel() {
-  document.getElementById("adminPanel").classList.add("hidden");
-  document.getElementById("mainCard").style.display = "block";
-}
-
-async function openEditEntry(id) {
-  editingEntryId = id;
-
-  const { data, error } = await _supabase
-    .from("time_entries")
-    .select("*")
-    .eq("id", id)
-    .single();
-
-  if (error) {
-    alert("Error loading entry");
-    return;
-  }
-
-  const ci = parseDbTimestamp(data.clock_in);
-  const co = parseDbTimestamp(data.clock_out);
-
-  document.getElementById("editClockIn").value =
-    ci ? ci.toISOString().slice(0,16) : "";
-
-  document.getElementById("editClockOut").value =
-    co ? co.toISOString().slice(0,16) : "";
-
-  document.getElementById("editEntryModal").classList.remove("hidden");
-}
-
-function closeEditModal() {
-  editingEntryId = null;
-  document.getElementById("editEntryModal").classList.add("hidden");
-}
-
-async function saveEditedEntry() {
-  if (!editingEntryId) return;
-
-  const newClockIn = document.getElementById("editClockIn").value;
-  const newClockOut = document.getElementById("editClockOut").value;
-
-  if (!newClockIn || !newClockOut) {
-    alert("Both times are required.");
-    return;
-  }
-
-  const clockInDate = new Date(newClockIn);
-  const clockOutDate = new Date(newClockOut);
-
-  if (clockOutDate <= clockInDate) {
-    alert("Clock out must be after clock in.");
-    return;
-  }
-
-  const shiftHours = (clockOutDate - clockInDate) / 3600000;
-  if (shiftHours <= 0 || shiftHours > 24) {
-      alert("Shift duration must be between 0 and 24 hours.");
-      return;
-  }
-
-  const { data: entryData, error: entryError } = await _supabase
-    .from("time_entries")
-    .select("employee_id, clock_in")
-    .eq("id", editingEntryId)
-    .single();
-
-  if (entryError) {
-    console.error("Save Error (loading entry):", entryError);
-    alert("Failed to load entry data: " + entryError.message);
-    return;
-  }
-
-  const { data: employee, error: empError } = await _supabase
-    .from("employees")
-    .select("hourly_rate, overtime_multiplier, tax_percent")
-    .eq("employee_id", entryData.employee_id)
-    .single();
-
-  if (empError) {
-    console.error("Save Error (loading employee):", empError);
-    alert("Failed to load employee data: " + empError.message);
-    return;
-  }
-    
-  const weekStart = getWeekStart(clockInDate);
-  const weekEnd = getWeekEnd(clockInDate);
-
-  const { data: weekEntries, error: weekEntriesError } = await _supabase
-    .from("time_entries")
-    .select("regular_hours, overtime_hours, id")
-    .eq("employee_id", entryData.employee_id)
-    .gte("clock_in", weekStart.toISOString())
-    .lte("clock_in", weekEnd.toISOString());
-
-  if (weekEntriesError) {
-      console.error("Save Error (calculating weekly hours):", weekEntriesError);
-      alert("Could not calculate weekly hours: " + weekEntriesError.message);
-      return;
-  }
-
-  let weekTotalHoursBeforeThisEntry = 0;
-  if (weekEntries) {
-    weekEntries.forEach(e => {
-      if (e.id !== editingEntryId) {
-          weekTotalHoursBeforeThisEntry += (Number(e.regular_hours) || 0) + (Number(e.overtime_hours) || 0);
-      }
-    });
-  }
-
-  let regularHours = 0;
-  let overtimeHours = 0;
-  const safeWeekTotal = Math.max(0, weekTotalHoursBeforeThisEntry);
-
-  if (safeWeekTotal >= 40) {
-    overtimeHours = shiftHours;
-  } else if (safeWeekTotal + shiftHours <= 40) {
-    regularHours = shiftHours;
-  } else {
-    regularHours = 40 - safeWeekTotal;
-    overtimeHours = shiftHours - regularHours;
-  }
-  regularHours = Math.max(0, regularHours);
-  overtimeHours = Math.max(0, overtimeHours);
-
-  const round = (num) => Math.round(num * 100) / 100;
-  const totalHours = Number(shiftHours.toFixed(4));
-  const regularPay = round(regularHours * employee.hourly_rate);
-  const overtimePay = round(overtimeHours * employee.hourly_rate * employee.overtime_multiplier);
-  const grossPay = round(regularPay + overtimePay);
-  const taxes = round(grossPay * (employee.tax_percent / 100));
-  const netPay = round(grossPay - taxes);
-
-  const { error: updateError } = await _supabase
-    .from("time_entries")
-    .update({
-      clock_in: clockInDate.toISOString(),
-      clock_out: clockOutDate.toISOString(),
-      total_hours: totalHours,
-      regular_hours: Number(regularHours.toFixed(4)),
-      overtime_hours: Number(overtimeHours.toFixed(4)),
-      regular_pay: regularPay,
-      overtime_pay: overtimePay,
-      gross_pay: grossPay,
-      taxes: taxes,
-      net_pay: netPay
-    })
-    .eq("id", editingEntryId);
-
-  if (updateError) {
-    console.error("Supabase update error:", updateError);
-    alert("Error saving changes: " + updateError.message);
-    return;
-  }
-
-  alert("Entry updated successfully!");
-  closeEditModal();
-  viewTimeEntries();
+  sessionStorage.setItem('adminAuthenticated', 'true');
+  sessionStorage.setItem('adminData', JSON.stringify(data));
+  window.location.href = 'admin.html';
 }
 </script>
 
@@ -1081,78 +246,6 @@ async function saveEditedEntry() {
     <input type="password" id="adminPinInput" placeholder="PIN" />
     <button onclick="validateAdmin()">Enter</button>
     <button onclick="closeAdminModal()">Cancel</button>
-  </div>
-</div>
-
-<div id="adminPanel" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 9999; overflow: auto; padding: 20px;">
-  <h2>Admin Dashboard</h2>
-<p id="adminInfo"></p>
-
-<div id="dashboardMetrics" style="display: flex; justify-content: space-around; margin-bottom: 20px; text-align: center;">
-    <div>
-        <h4>Horas Hoy</h4>
-        <p id="metricHoursToday" style="font-size: 1.5rem; margin: 0;">...</p>
-    </div>
-    <div>
-        <h4>Fichados Ahora</h4>
-        <p id="metricClockedIn" style="font-size: 1.5rem; margin: 0;">...</p>
-    </div>
-    <div>
-        <h4>Nómina Semanal</h4>
-        <p id="metricWeeklyPayroll" style="font-size: 1.5rem; margin: 0;">...</p>
-    </div>
-</div>
-
-<div id="adminActions"></div>
-
-<button onclick="closeAdminPanel()">Close</button>
-</div>
-
-<div id="manageEmployeesPanel" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 10000; overflow: auto; padding: 20px;">
-  <h2>Manage Employees</h2>
-  <button onclick="showNewEmployeeForm()">Create New Employee</button>
-  <hr>
-  
-  <div id="newEmployeeFormContainer" class="hidden">
-    <h3>Create New Employee</h3>
-    <input type="number" id="newEmpId" placeholder="Employee ID (4 digits)" oninput="if(this.value.length > 4) this.value = this.value.slice(0,4);"><br><br>
-    <input type="text" id="newEmpName" placeholder="Full Name"><br><br>
-    <input type="number" id="newEmpRate" placeholder="Hourly Rate (e.g., 15.50)" step="0.01"><br><br>
-    <input type="password" id="newEmpPin" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" pattern="[0-9]*"><br><br>
-    <button onclick="saveNewEmployee()">Save Employee</button>
-    <button onclick="cancelNewEmployee()">Cancel</button>
-  </div>
-
-  <div id="editEmployeeFormContainer" class="hidden">
-    <h3>Edit Employee</h3>
-    Employee ID: <input type="text" id="editEmpId" readonly><br><br>
-    <input type="text" id="editEmpName" placeholder="Full Name"><br><br>
-    <input type="number" id="editEmpRate" placeholder="Hourly Rate (e.g., 15.50)" step="0.01"><br><br>
-    <input type="password" id="editEmpPin" placeholder="New 4-digit PIN (optional)" maxlength="4" inputmode="numeric" pattern="[0-9]*"><br><br>
-    <label><input type="checkbox" id="editEmpActive"> Active</label><br><br>
-    <button onclick="saveEditedEmployee()">Save Changes</button>
-    <button onclick="cancelEditEmployee()">Cancel</button>
-  </div>
-
-  <div id="employeeListContainer">
-    <!-- La lista de empleados se renderizará aquí -->
-  </div>
-  <br>
-  <button onclick="showAdminPanel(window.currentAdmin)">Back to Admin Panel</button>
-</div>
-
-<div id="editEntryModal" class="modal hidden">
-  <div class="modal-content">
-    <h3>Edit Time Entry</h3>
-
-    <label>Clock In</label>
-    <input type="datetime-local" id="editClockIn" />
-
-    <label>Clock Out</label>
-    <input type="datetime-local" id="editClockOut" />
-
-    <button onclick="saveEditedEntry()">Save</button>
-    <button onclick="closeEditModal()">Cancel</button>
   </div>
 </div>
 
