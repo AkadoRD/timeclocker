@@ -500,11 +500,56 @@ async function validateAdmin() {
   showAdminPanel(data);
 }
 
+async function updateDashboardMetrics() {
+  document.getElementById("metricHoursToday").innerText = "...";
+  document.getElementById("metricClockedIn").innerText = "...";
+  document.getElementById("metricWeeklyPayroll").innerText = "...";
+
+  // 1. Total employees currently clocked in
+  const { count: clockedInCount, error: clockedInError } = await _supabase
+    .from("time_entries")
+    .select('*', { count: 'exact', head: true })
+    .is("clock_out", null);
+  document.getElementById("metricClockedIn").innerText = clockedInError ? 'E' : clockedInCount;
+
+  // 2. Total hours today
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+  const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+  const { data: todayEntries, error: todayError } = await _supabase
+    .from("time_entries")
+    .select("total_hours")
+    .gte("clock_in", startOfDay.toISOString())
+    .lte("clock_in", endOfDay.toISOString());
+
+  let totalHoursToday = 0;
+  if (todayEntries) {
+    totalHoursToday = todayEntries.reduce((sum, entry) => sum + (entry.total_hours || 0), 0);
+  }
+  document.getElementById("metricHoursToday").innerText = todayError ? 'E' : totalHoursToday.toFixed(2);
+
+  // 3. Weekly payroll total
+  const weekStart = getWeekStart(new Date());
+  const { data: weekEntries, error: weekError } = await _supabase
+    .from("time_entries")
+    .select("gross_pay")
+    .gte("clock_in", weekStart);
+
+  let weeklyPayroll = 0;
+  if (weekEntries) {
+    weeklyPayroll = weekEntries.reduce((sum, entry) => sum + (entry.gross_pay || 0), 0);
+  }
+  document.getElementById("metricWeeklyPayroll").innerText = weekError ? 'E' : `$${(weeklyPayroll || 0).toFixed(2)}`;
+}
+
 function showAdminPanel(admin) {
   window.currentAdmin = admin;
 
   document.getElementById("mainCard").style.display = "none";
   document.getElementById("adminPanel").classList.remove("hidden");
+
+  updateDashboardMetrics();
 
   document.getElementById("adminInfo").innerText =
     "Welcome " + admin.name + " (" + admin.role + ")";
@@ -812,6 +857,21 @@ async function saveEditedEntry() {
 <div id="adminPanel" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 9999; overflow: auto; padding: 20px;">
   <h2>Admin Dashboard</h2>
 <p id="adminInfo"></p>
+
+<div id="dashboardMetrics" style="display: flex; justify-content: space-around; margin-bottom: 20px; text-align: center;">
+    <div>
+        <h4>Horas Hoy</h4>
+        <p id="metricHoursToday" style="font-size: 1.5rem; margin: 0;">...</p>
+    </div>
+    <div>
+        <h4>Fichados Ahora</h4>
+        <p id="metricClockedIn" style="font-size: 1.5rem; margin: 0;">...</p>
+    </div>
+    <div>
+        <h4>Nómina Semanal</h4>
+        <p id="metricWeeklyPayroll" style="font-size: 1.5rem; margin: 0;">...</p>
+    </div>
+</div>
 
 <div id="adminActions"></div>
 
