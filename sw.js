@@ -1,4 +1,4 @@
-      const CACHE_NAME = "timeclocker-v11";
+      const CACHE_NAME = "timeclocker-v12";
       
       const urlsToCache = [
         "./",
@@ -14,7 +14,7 @@
        event.waitUntil(
          caches.open(CACHE_NAME)
            .then(cache => {
-             console.log("Archivos cacheados");
+             console.log("Archivos cacheados (v12)");
              return cache.addAll(urlsToCache);
            })
            .then(() => self.skipWaiting())
@@ -28,6 +28,7 @@
            return Promise.all(
              cacheNames.map(cache => {
                if (cache !== CACHE_NAME) {
+                 console.log("Borrando caché antigua:", cache);
                  return caches.delete(cache);
                }
              })
@@ -36,7 +37,7 @@
        );
      });
      
-     // index.html siempre desde la red para tener la última versión; el resto cache first
+     // Estrategia de Fetch (sin cambios)
      self.addEventListener("fetch", event => {
        const url = new URL(event.request.url);
        const isIndex = event.request.mode === "navigate" || url.pathname.endsWith("/") || url.pathname.endsWith("index.html");
