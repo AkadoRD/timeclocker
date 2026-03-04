@@ -1,4 +1,4 @@
-const CACHE_NAME = "timeclocker-v8";
+const CACHE_NAME = "timeclocker-v9";
 
 const urlsToCache = [
   "./",
