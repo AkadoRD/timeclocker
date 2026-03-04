@@ -220,6 +220,7 @@ if (typeof syncOfflineEntries === "function") {
 }
 
 let editingEntryId = null;
+let editingEmployeeId = null;
 
 function updateClock() {
   const now = new Date();
@@ -569,6 +570,7 @@ async function manageEmployees() {
   document.getElementById("adminPanel").classList.add("hidden");
   document.getElementById("manageEmployeesPanel").classList.remove("hidden");
   document.getElementById("newEmployeeFormContainer").classList.add("hidden");
+  document.getElementById("editEmployeeFormContainer").classList.add("hidden");
   document.getElementById("employeeListContainer").classList.remove("hidden");
   await renderEmployeeList();
 }
@@ -607,7 +609,7 @@ async function renderEmployeeList() {
           <td style="padding: 4px;">$${emp.hourly_rate}/hr</td>
           <td style="padding: 4px;">${status}</td>
           <td style="padding: 4px;">
-            <button onclick="alert('Edit employee ${emp.id}')">Edit</button>
+            <button onclick="openEditEmployeeForm(${emp.id})">Edit</button>
           </td>
         </tr>
       `;
@@ -619,6 +621,7 @@ async function renderEmployeeList() {
 
 function showNewEmployeeForm() {
   document.getElementById("employeeListContainer").classList.add("hidden");
+  document.getElementById("editEmployeeFormContainer").classList.add("hidden");
   document.getElementById("newEmployeeFormContainer").classList.remove("hidden");
   document.getElementById("newEmpId").value = "";
   document.getElementById("newEmpName").value = "";
@@ -666,6 +669,78 @@ async function saveNewEmployee() {
   } else {
     alert("Employee created successfully!");
     cancelNewEmployee();
+    renderEmployeeList();
+  }
+}
+
+async function openEditEmployeeForm(employeeId) {
+  editingEmployeeId = employeeId;
+  
+  const { data, error } = await _supabase
+    .from("employees")
+    .select("*")
+    .eq("id", employeeId)
+    .single();
+
+  if (error) {
+    alert("Error fetching employee data.");
+    return;
+  }
+
+  document.getElementById("editEmpId").value = data.employee_id;
+  document.getElementById("editEmpName").value = data.name;
+  document.getElementById("editEmpRate").value = data.hourly_rate;
+  document.getElementById("editEmpActive").checked = data.active;
+  document.getElementById("editEmpPin").value = ""; // Clear PIN for security
+
+  document.getElementById("employeeListContainer").classList.add("hidden");
+  document.getElementById("newEmployeeFormContainer").classList.add("hidden");
+  document.getElementById("editEmployeeFormContainer").classList.remove("hidden");
+}
+
+function cancelEditEmployee() {
+  editingEmployeeId = null;
+  document.getElementById("editEmployeeFormContainer").classList.add("hidden");
+  document.getElementById("employeeListContainer").classList.remove("hidden");
+}
+
+async function saveEditedEmployee() {
+  if (!editingEmployeeId) return;
+
+  const name = document.getElementById("editEmpName").value.trim();
+  const rate = document.getElementById("editEmpRate").value.trim();
+  const pin = document.getElementById("editEmpPin").value.trim();
+  const active = document.getElementById("editEmpActive").checked;
+
+  if (!name || !rate) {
+    alert("Name and Hourly Rate are required.");
+    return;
+  }
+
+  let updateData = {
+    name: name,
+    hourly_rate: parseFloat(rate),
+    active: active
+  };
+
+  if (pin) {
+    if (!/^\d{4}$/.test(pin)) {
+      alert("If changing PIN, it must be 4 digits.");
+      return;
+    }
+    updateData.pin = pin;
+  }
+
+  const { error } = await _supabase
+    .from("employees")
+    .update(updateData)
+    .eq("id", editingEmployeeId);
+
+  if (error) {
+    alert("Error updating employee: " + error.message);
+  } else {
+    alert("Employee updated successfully!");
+    cancelEditEmployee();
     renderEmployeeList();
   }
 }
@@ -1046,6 +1121,17 @@ async function saveEditedEntry() {
     <input type="password" id="newEmpPin" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" pattern="[0-9]*"><br><br>
     <button onclick="saveNewEmployee()">Save Employee</button>
     <button onclick="cancelNewEmployee()">Cancel</button>
+  </div>
+
+  <div id="editEmployeeFormContainer" class="hidden">
+    <h3>Edit Employee</h3>
+    Employee ID: <input type="text" id="editEmpId" readonly><br><br>
+    <input type="text" id="editEmpName" placeholder="Full Name"><br><br>
+    <input type="number" id="editEmpRate" placeholder="Hourly Rate (e.g., 15.50)" step="0.01"><br><br>
+    <input type="password" id="editEmpPin" placeholder="New 4-digit PIN (optional)" maxlength="4" inputmode="numeric" pattern="[0-9]*"><br><br>
+    <label><input type="checkbox" id="editEmpActive"> Active</label><br><br>
+    <button onclick="saveEditedEmployee()">Save Changes</button>
+    <button onclick="cancelEditEmployee()">Cancel</button>
   </div>
 
   <div id="employeeListContainer">
