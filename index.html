@@ -28,6 +28,12 @@
     }
 
     async function syncOfflineEntries() {
+      // Evita errores si Supabase aún no está inicializado
+      if (typeof _supabase === "undefined") {
+        console.warn("Supabase not ready yet, will sync later.");
+        return;
+      }
+
       let pending = JSON.parse(localStorage.getItem("pendingEntries")) || [];
       if (pending.length === 0) return;
       let remaining = [];
@@ -210,6 +216,11 @@ const _supabase = supabase.createClient(
   "sb_publishable_ZwLCHMtM9uCfBFkwBcSSEQ_zQVq1RwI"
 );
 
+// Asegura que la sincronización offline se intente nuevamente
+if (typeof syncOfflineEntries === "function") {
+  syncOfflineEntries();
+}
+
 let editingEntryId = null;
 
 function updateClock() {
@@ -228,6 +239,36 @@ async function employeeExists(empId) {
   if (!navigator.onLine) return true;
   const { data, error } = await _supabase.from("employees").select("employee_id").eq("employee_id", empId).single();
   return !error && !!data;
+}
+
+function getWeekStart(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day;
+  const weekStart = new Date(d.setDate(diff));
+  weekStart.setHours(0,0,0,0);
+  return weekStart.toISOString();
+}
+
+// Normaliza timestamps que vienen de la base (con o sin zona horaria)
+function parseDbTimestamp(value) {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  let s = String(value).trim();
+  if (!s) return null;
+
+  // Reemplaza espacio por 'T' si viene como "2026-03-01 18:08:51.106"
+  if (!s.includes("T")) {
+    s = s.replace(" ", "T");
+  }
+
+  // Si no tiene zona horaria explícita, asumimos UTC
+  if (!/[zZ]|[+-]\d\d:?\d\d$/.test(s)) {
+    s += "Z";
+  }
+
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
 }
 
 async function clockIn() {
@@ -258,6 +299,13 @@ async function clockIn() {
     clock_in: now.toISOString(),
     clock_in_local: now.toLocaleString("en-US", { timeZone: "America/New_York" })
   };
+
+  // Guardamos también el clock in local en este dispositivo para calcular horas sin depender de zonas horarias del servidor
+  try {
+    localStorage.setItem(`clockIn_${empId}`, now.toISOString());
+  } catch (e) {
+    console.warn("No se pudo guardar clockIn en localStorage", e);
+  }
 
   if (!isOnline()) {
     saveOfflineEntry(entry);
@@ -316,16 +364,35 @@ async function clockOut() {
   const clockOutISO = now.toISOString();
   const clockOutLocalStr = now.toLocaleString("en-US", { timeZone: "America/New_York" });
   
-  const clockInTime = new Date(openEntry.clock_in);
-  const shiftHours = (now - clockInTime) / 3600000;
+  // Hora de entrada: 1) localStorage (mismo dispositivo), 2) clock_in de la base como UTC
+  let clockInTime = null;
+  try {
+    const stored = localStorage.getItem(`clockIn_${empId}`);
+    if (stored) {
+      clockInTime = new Date(stored);
+    }
+  } catch (e) {
+    console.warn("No se pudo leer clockIn de localStorage", e);
+  }
+  if (!clockInTime && openEntry.clock_in) {
+    clockInTime = parseDbTimestamp(openEntry.clock_in);
+  }
+  if (!clockInTime) {
+    msg.innerText = "No se puede calcular el turno. Pida al administrador que ajuste la entrada.";
+    msg.classList.add("msg-error");
+    return;
+  }
 
-  function getWeekStart(date) {
-    const d = new Date(date);
-    const day = d.getDay();
-    const diff = d.getDate() - day;
-    const weekStart = new Date(d.setDate(diff));
-    weekStart.setHours(0,0,0,0);
-    return weekStart.toISOString();
+  let shiftHours = (now - clockInTime) / 3600000;
+
+  // NUNCA guardar ni mostrar horas negativas (protección contra zona horaria/caché)
+  if (shiftHours < 0) {
+    shiftHours = 0;
+  }
+  if (shiftHours > 24) {
+    msg.innerText = "Turno mayor a 24 horas. Cierre desde el panel de administración.";
+    msg.classList.add("msg-error");
+    return;
   }
 
   const weekStart = getWeekStart(now);
@@ -343,14 +410,17 @@ async function clockOut() {
 
   let regularHours = 0;
   let overtimeHours = 0;
-  if (weekTotal >= 40) {
+  const safeWeekTotal = Math.max(0, weekTotal);
+  if (safeWeekTotal >= 40) {
     overtimeHours = shiftHours;
-  } else if (weekTotal + shiftHours <= 40) {
+  } else if (safeWeekTotal + shiftHours <= 40) {
     regularHours = shiftHours;
   } else {
-    regularHours = 40 - weekTotal;
+    regularHours = 40 - safeWeekTotal;
     overtimeHours = shiftHours - regularHours;
   }
+  regularHours = Math.max(0, regularHours);
+  overtimeHours = Math.max(0, overtimeHours);
 
   const { data: employee } = await _supabase.from("employees").select("hourly_rate, overtime_multiplier, tax_percent").eq("employee_id", empId).single();
 
@@ -378,6 +448,7 @@ async function clockOut() {
     msg.innerText = error.message;
     msg.classList.add("msg-error");
   } else {
+    try { localStorage.removeItem(`clockIn_${empId}`); } catch (e) {}
     msg.innerText = `Out: ${regularHours.toFixed(2)} reg / ${overtimeHours.toFixed(2)} OT`;
     msg.classList.add("msg-success");
     clearInput();
@@ -482,7 +553,7 @@ async function viewTimeEntries() {
  data.forEach(entry => {
 
   let clockOutDisplay = entry.clock_out
-    ? new Date(entry.clock_out).toLocaleString()
+    ? parseDbTimestamp(entry.clock_out)?.toLocaleString() || "INVALID"
     : "OPEN";
 
   let actionButton = `
@@ -498,7 +569,7 @@ if (!entry.clock_out) {
   html += `
     <tr>
       <td>${entry.employee_id}</td>
-      <td>${new Date(entry.clock_in).toLocaleString()}</td>
+      <td>${parseDbTimestamp(entry.clock_in)?.toLocaleString() || "INVALID"}</td>
       <td>${clockOutDisplay}</td>
       <td>${actionButton}</td>
     </tr>
@@ -515,12 +586,97 @@ async function adminCloseEntry(entryId) {
 
   if (!confirm("Close this entry now?")) return;
 
-  const { error } = await _supabase
+  const { data: entry, error: loadError } = await _supabase
     .from("time_entries")
-    .update({ clock_out: new Date().toISOString() })
-    .eq("id", entryId);
+    .select("id, employee_id, clock_in")
+    .eq("id", entryId)
+    .single();
 
-  if (error) {
+  if (loadError || !entry) {
+    alert("Error loading entry");
+    return;
+  }
+
+  const now = new Date();
+  const clockOutISO = now.toISOString();
+  const clockOutLocalStr = now.toLocaleString("en-US", { timeZone: "America/New_York" });
+
+  const clockInTime = parseDbTimestamp(entry.clock_in);
+  if (!clockInTime || now <= clockInTime) {
+    alert("Clock in time is invalid");
+    return;
+  }
+  const shiftHours = (now - clockInTime) / 3600000;
+  console.log("DEBUG adminCloseEntry", {
+    dbClockIn: entry.clock_in,
+    parsedClockIn: clockInTime.toISOString(),
+    nowIso: now.toISOString(),
+    shiftHours
+  });
+
+  const weekStart = getWeekStart(now);
+  const { data: weekEntries } = await _supabase
+    .from("time_entries")
+    .select("regular_hours, overtime_hours, clock_out")
+    .eq("employee_id", entry.employee_id)
+    .gte("clock_in", weekStart);
+
+  let weekTotal = 0;
+  if (weekEntries) {
+    weekEntries.forEach(e => {
+      if (e.clock_out) {
+        weekTotal += Number(e.regular_hours || 0);
+        weekTotal += Number(e.overtime_hours || 0);
+      }
+    });
+  }
+
+  let regularHours = 0;
+  let overtimeHours = 0;
+  if (weekTotal >= 40) {
+    overtimeHours = shiftHours;
+  } else if (weekTotal + shiftHours <= 40) {
+    regularHours = shiftHours;
+  } else {
+    regularHours = 40 - weekTotal;
+    overtimeHours = shiftHours - regularHours;
+  }
+
+  const { data: employee, error: empError } = await _supabase
+    .from("employees")
+    .select("hourly_rate, overtime_multiplier, tax_percent")
+    .eq("employee_id", entry.employee_id)
+    .single();
+
+  if (empError || !employee) {
+    alert("Error loading employee");
+    return;
+  }
+
+  const round = (num) => Math.round(num * 100) / 100;
+  const regularPay = round(regularHours * employee.hourly_rate);
+  const overtimePay = round(overtimeHours * employee.hourly_rate * employee.overtime_multiplier);
+  const grossPay = round(regularPay + overtimePay);
+  const taxes = round(grossPay * (employee.tax_percent / 100));
+  const netPay = round(grossPay - taxes);
+
+  const { error: updateError } = await _supabase
+    .from("time_entries")
+    .update({
+      clock_out: clockOutISO,
+      clock_out_local: clockOutLocalStr,
+      total_hours: Number(shiftHours.toFixed(4)),
+      regular_hours: Number(regularHours.toFixed(4)),
+      overtime_hours: Number(overtimeHours.toFixed(4)),
+      regular_pay: regularPay,
+      overtime_pay: overtimePay,
+      gross_pay: grossPay,
+      taxes: taxes,
+      net_pay: netPay
+    })
+    .eq("id", entry.id);
+
+  if (updateError) {
     alert("Error closing entry");
     return;
   }
@@ -556,11 +712,14 @@ async function openEditEntry(id) {
     return;
   }
 
+  const ci = parseDbTimestamp(data.clock_in);
+  const co = parseDbTimestamp(data.clock_out);
+
   document.getElementById("editClockIn").value =
-    data.clock_in ? new Date(data.clock_in).toISOString().slice(0,16) : "";
+    ci ? ci.toISOString().slice(0,16) : "";
 
   document.getElementById("editClockOut").value =
-    data.clock_out ? new Date(data.clock_out).toISOString().slice(0,16) : "";
+    co ? co.toISOString().slice(0,16) : "";
 
   document.getElementById("editEntryModal").classList.remove("hidden");
 }
@@ -600,25 +759,34 @@ async function saveEditedEntry() {
 
   const { data: employee } = await _supabase
     .from("employees")
-    .select("hourly_rate, overtime_multiplier")
+    .select("hourly_rate, overtime_multiplier, tax_percent")
     .eq("employee_id", entryData.employee_id)
     .single();
 
   const regularHours = Math.min(shiftHours, 40);
   const overtimeHours = Math.max(shiftHours - 40, 0);
 
-  const regularPay = regularHours * employee.hourly_rate;
-  const overtimePay = overtimeHours * employee.hourly_rate * employee.overtime_multiplier;
-  const grossPay = regularPay + overtimePay;
+  const round = (num) => Math.round(num * 100) / 100;
+  const totalHours = Number(shiftHours.toFixed(4));
+  const regularPay = round(regularHours * employee.hourly_rate);
+  const overtimePay = round(overtimeHours * employee.hourly_rate * employee.overtime_multiplier);
+  const grossPay = round(regularPay + overtimePay);
+  const taxes = round(grossPay * (employee.tax_percent / 100));
+  const netPay = round(grossPay - taxes);
 
   const { error } = await _supabase
     .from("time_entries")
     .update({
       clock_in: clockInDate.toISOString(),
       clock_out: clockOutDate.toISOString(),
-      regular_hours: regularHours,
-      overtime_hours: overtimeHours,
-      gross_pay: grossPay
+      total_hours: totalHours,
+      regular_hours: Number(regularHours.toFixed(4)),
+      overtime_hours: Number(overtimeHours.toFixed(4)),
+      regular_pay: regularPay,
+      overtime_pay: overtimePay,
+      gross_pay: grossPay,
+      taxes: taxes,
+      net_pay: netPay
     })
     .eq("id", editingEntryId);
 

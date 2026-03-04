@@ -1,4 +1,4 @@
-const CACHE_NAME = "timeclocker-v4";
+const CACHE_NAME = "timeclocker-v8";
 
 const urlsToCache = [
   "./",
@@ -16,6 +16,7 @@ self.addEventListener("install", event => {
         console.log("Archivos cacheados");
         return cache.addAll(urlsToCache);
       })
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -30,21 +31,23 @@ self.addEventListener("activate", event => {
           }
         })
       );
-    })
+    }).then(() => self.clients.claim())
   );
 });
 
-// Estrategia: Cache first, luego red
+// index.html siempre desde la red para tener la última versión; el resto cache first
 self.addEventListener("fetch", event => {
+  const url = new URL(event.request.url);
+  const isIndex = event.request.mode === "navigate" || url.pathname.endsWith("/") || url.pathname.endsWith("index.html");
+  if (isIndex) {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match("index.html"))
+    );
+    return;
+  }
   event.respondWith(
     caches.match(event.request)
-      .then(response => {
-        return response || fetch(event.request);
-      })
-      .catch(() => {
-        if (event.request.mode === "navigate") {
-          return caches.match("index.html");
-        }
-      })
+      .then(response => response || fetch(event.request))
+      .catch(() => event.request.mode === "navigate" ? caches.match("index.html") : null)
   );
 });
