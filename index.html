@@ -568,6 +568,8 @@ function showAdminPanel(admin) {
 async function manageEmployees() {
   document.getElementById("adminPanel").classList.add("hidden");
   document.getElementById("manageEmployeesPanel").classList.remove("hidden");
+  document.getElementById("newEmployeeFormContainer").classList.add("hidden");
+  document.getElementById("employeeListContainer").classList.remove("hidden");
   await renderEmployeeList();
 }
 
@@ -613,6 +615,51 @@ async function renderEmployeeList() {
 
     html += "</table><br>";
     container.innerHTML = html;
+}
+
+function showNewEmployeeForm() {
+  document.getElementById("employeeListContainer").classList.add("hidden");
+  document.getElementById("newEmployeeFormContainer").classList.remove("hidden");
+  document.getElementById("newEmpId").value = "";
+  document.getElementById("newEmpName").value = "";
+  document.getElementById("newEmpRate").value = "";
+}
+
+function cancelNewEmployee() {
+  document.getElementById("newEmployeeFormContainer").classList.add("hidden");
+  document.getElementById("employeeListContainer").classList.remove("hidden");
+}
+
+async function saveNewEmployee() {
+  const empId = document.getElementById("newEmpId").value.trim();
+  const name = document.getElementById("newEmpName").value.trim();
+  const rate = document.getElementById("newEmpRate").value.trim();
+
+  if (!empId || !name || !rate) {
+    alert("All fields are required.");
+    return;
+  }
+
+  if (isNaN(rate) || parseFloat(rate) <= 0) {
+    alert("Hourly rate must be a positive number.");
+    return;
+  }
+
+  const { data, error } = await _supabase
+    .from("employees")
+    .insert([{ 
+      employee_id: empId, 
+      name: name, 
+      hourly_rate: parseFloat(rate)
+    }]);
+
+  if (error) {
+    alert("Error creating employee: " + error.message);
+  } else {
+    alert("Employee created successfully!");
+    cancelNewEmployee();
+    renderEmployeeList();
+  }
 }
 
 
@@ -980,8 +1027,18 @@ async function saveEditedEntry() {
 
 <div id="manageEmployeesPanel" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 10000; overflow: auto; padding: 20px;">
   <h2>Manage Employees</h2>
-  <button onclick="alert('New employee form coming soon!')">Create New Employee</button>
+  <button onclick="showNewEmployeeForm()">Create New Employee</button>
   <hr>
+  
+  <div id="newEmployeeFormContainer" class="hidden">
+    <h3>Create New Employee</h3>
+    <input type="number" id="newEmpId" placeholder="Employee ID (e.g., 0012)"><br><br>
+    <input type="text" id="newEmpName" placeholder="Full Name"><br><br>
+    <input type="number" id="newEmpRate" placeholder="Hourly Rate (e.g., 15.50)"><br><br>
+    <button onclick="saveNewEmployee()">Save Employee</button>
+    <button onclick="cancelNewEmployee()">Cancel</button>
+  </div>
+
   <div id="employeeListContainer">
     <!-- La lista de empleados se renderizará aquí -->
   </div>
