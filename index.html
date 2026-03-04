@@ -623,6 +623,7 @@ function showNewEmployeeForm() {
   document.getElementById("newEmpId").value = "";
   document.getElementById("newEmpName").value = "";
   document.getElementById("newEmpRate").value = "";
+  document.getElementById("newEmpPin").value = "";
 }
 
 function cancelNewEmployee() {
@@ -634,8 +635,9 @@ async function saveNewEmployee() {
   const empId = document.getElementById("newEmpId").value.trim();
   const name = document.getElementById("newEmpName").value.trim();
   const rate = document.getElementById("newEmpRate").value.trim();
+  const pin = document.getElementById("newEmpPin").value.trim();
 
-  if (!empId || !name || !rate) {
+  if (!empId || !name || !rate || !pin) {
     alert("All fields are required.");
     return;
   }
@@ -645,12 +647,18 @@ async function saveNewEmployee() {
     return;
   }
 
+  if (!/^\d{4}$/.test(pin)) {
+      alert("PIN must be 4 digits.");
+      return;
+  }
+
   const { data, error } = await _supabase
     .from("employees")
     .insert([{ 
       employee_id: empId, 
       name: name, 
-      hourly_rate: parseFloat(rate)
+      hourly_rate: parseFloat(rate),
+      pin: pin
     }]);
 
   if (error) {
@@ -1032,9 +1040,10 @@ async function saveEditedEntry() {
   
   <div id="newEmployeeFormContainer" class="hidden">
     <h3>Create New Employee</h3>
-    <input type="number" id="newEmpId" placeholder="Employee ID (e.g., 0012)"><br><br>
+    <input type="number" id="newEmpId" placeholder="Employee ID (4 digits)" oninput="if(this.value.length > 4) this.value = this.value.slice(0,4);"><br><br>
     <input type="text" id="newEmpName" placeholder="Full Name"><br><br>
-    <input type="number" id="newEmpRate" placeholder="Hourly Rate (e.g., 15.50)"><br><br>
+    <input type="number" id="newEmpRate" placeholder="Hourly Rate (e.g., 15.50)" step="0.01"><br><br>
+    <input type="password" id="newEmpPin" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" pattern="[0-9]*"><br><br>
     <button onclick="saveNewEmployee()">Save Employee</button>
     <button onclick="cancelNewEmployee()">Cancel</button>
   </div>
