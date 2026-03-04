@@ -83,6 +83,19 @@
   <button onclick="showAdminDashboard()">Back to Admin Panel</button>
 </div>
 
+<div id="createAdminPanel" class="panel hidden">
+  <h2>Create New Admin</h2>
+  <input type="text" id="newAdminName" placeholder="Full Name"><br><br>
+  <input type="email" id="newAdminEmail" placeholder="Email Address"><br><br>
+  <input type="password" id="newAdminPassword" placeholder="Password"><br><br>
+  <select id="newAdminRole">
+    <option value="manager">Manager</option>
+    <option value="owner">Owner</option>
+  </select><br><br>
+  <button onclick="saveNewAdmin()">Save Admin</button>
+  <button onclick="cancelNewAdmin()">Cancel</button>
+</div>
+
 <div id="editEntryModal" class="modal hidden">
   <div class="modal-content">
     <h3>Edit Time Entry</h3>
@@ -92,6 +105,20 @@
     <input type="datetime-local" id="editClockOut" />
     <button onclick="saveEditedEntry()">Save</button>
     <button onclick="closeEditModal()">Cancel</button>
+  </div>
+</div>
+
+<div id="reportModal" class="modal hidden">
+  <div class="modal-content">
+    <h3>Export Time Report</h3>
+    <label for="reportStartDate">Start Date:</label>
+    <input type="date" id="reportStartDate">
+    <br><br>
+    <label for="reportEndDate">End Date:</label>
+    <input type="date" id="reportEndDate">
+    <br><br>
+    <button onclick="generateCSVReport()">Generate CSV</button>
+    <button onclick="closeReportModal()">Cancel</button>
   </div>
 </div>
 
@@ -141,6 +168,7 @@ async function updateDashboardMetrics() {
 
 function showAdminDashboard() {
   document.getElementById("manageEmployeesPanel").classList.add("hidden");
+  document.getElementById("createAdminPanel").classList.add("hidden");
   document.getElementById("adminPanel").classList.remove("hidden");
   const adminActions = document.getElementById('adminActions');
   if (adminActions.querySelector('h3')) {
@@ -235,6 +263,319 @@ async function saveEditedEmployee() {
   else { alert("Employee updated successfully!"); cancelEditEmployee(); renderEmployeeList(); }
 }
 
+function createAdmin() {
+  document.getElementById("adminPanel").classList.add("hidden");
+  document.getElementById("createAdminPanel").classList.remove("hidden");
+}
+
+function cancelNewAdmin() {
+  document.getElementById("createAdminPanel").classList.add("hidden");
+  document.getElementById("adminPanel").classList.remove("hidden");
+}
+
+async function saveNewAdmin() {
+  const name = document.getElementById("newAdminName").value.trim();
+  const email = document.getElementById("newAdminEmail").value.trim();
+  const password = document.getElementById("newAdminPassword").value;
+  const role = document.getElementById("newAdminRole").value;
+
+  if (!name || !email || !password || !role) {
+    alert("All fields are required to create a new admin.");
+    return;
+  }
+  
+  // A simple email validation
+  if (!/\S+@\S+\.\S+/.test(email)) {
+    alert("Please enter a valid email address.");
+    return;
+  }
+
+  const { data, error } = await _supabase.from('admins').insert([
+    { name, email, role, password } // Storing password directly. For production, use Supabase Auth.
+  ]);
+
+  if (error) {
+    alert("Error creating new admin: " + error.message);
+  } else {
+    alert("Admin created successfully!");
+    cancelNewAdmin();
+  }
+}
+
+function closeEditModal() {
+  editingEntryId = null;
+  document.getElementById('editEntryModal').classList.add('hidden');
+}
+
+async function openEditEntry(entryId) {
+  editingEntryId = entryId;
+  const modal = document.getElementById('editEntryModal');
+  const clockInInput = document.getElementById('editClockIn');
+  const clockOutInput = document.getElementById('editClockOut');
+  
+  clockInInput.value = '';
+  clockOutInput.value = '';
+  modal.classList.remove('hidden');
+
+  const { data: entry, error } = await _supabase
+    .from('time_entries')
+    .select('clock_in, clock_out')
+    .eq('id', entryId)
+    .single();
+
+  if (error || !entry) {
+    alert('Error fetching entry data.');
+    closeEditModal();
+    return;
+  }
+  
+  function toLocalISOString(date) {
+    if (!date) return '';
+    const d = new Date(date);
+    const tzOffset = d.getTimezoneOffset() * 60000; // Offset in milliseconds
+    const localISOTime = new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
+    return localISOTime;
+  }
+
+  clockInInput.value = toLocalISOString(parseDbTimestamp(entry.clock_in));
+  if (entry.clock_out) {
+    clockOutInput.value = toLocalISOString(parseDbTimestamp(entry.clock_out));
+  }
+}
+
+async function saveEditedEntry() {
+  if (!editingEntryId) return;
+
+  const clockInValue = document.getElementById('editClockIn').value;
+  const clockOutValue = document.getElementById('editClockOut').value;
+
+  if (!clockInValue) {
+    alert('Clock In time cannot be empty.');
+    return;
+  }
+  
+  const newClockIn = new Date(clockInValue);
+  const newClockOut = clockOutValue ? new Date(clockOutValue) : null;
+
+  if (newClockOut && newClockOut < newClockIn) {
+      alert('Clock Out time cannot be earlier than Clock In time.');
+      return;
+  }
+  
+  const { data: entry, error: entryError } = await _supabase
+    .from("time_entries")
+    .select("*, employees(*)")
+    .eq("id", editingEntryId)
+    .single();
+    
+  if (entryError || !entry) {
+    alert("Error fetching entry data for recalculation.");
+    return;
+  }
+
+  const employee = entry.employees;
+  let updateData = {
+      clock_in: newClockIn.toISOString(),
+      clock_out: newClockOut ? newClockOut.toISOString() : null
+  };
+
+  if (newClockOut) {
+      const totalMilliseconds = newClockOut.getTime() - newClockIn.getTime();
+      const shiftTotalHours = Math.max(0, totalMilliseconds / (1000 * 60 * 60));
+
+      const weekStart = getWeekStart(newClockIn).toISOString();
+      const { data: weekEntries, error: weekError } = await _supabase
+        .from("time_entries")
+        .select("total_hours")
+        .eq("employee_id", entry.employee_id)
+        .gte("clock_in", weekStart)
+        .not("id", "eq", editingEntryId);
+
+      if (weekError) {
+          alert("Error calculating weekly hours: " + weekError.message);
+          return;
+      }
+
+      const weeklyHoursBeforeThisShift = weekEntries.reduce((sum, e) => sum + (e.total_hours || 0), 0);
+      
+      const overtimeThreshold = 40;
+      let regularHours = 0;
+      let overtimeHours = 0;
+
+      if (weeklyHoursBeforeThisShift >= overtimeThreshold) {
+        overtimeHours = shiftTotalHours;
+      } else {
+        const remainingRegularHours = overtimeThreshold - weeklyHoursBeforeThisShift;
+        if (shiftTotalHours <= remainingRegularHours) {
+          regularHours = shiftTotalHours;
+        } else {
+          regularHours = remainingRegularHours;
+          overtimeHours = shiftTotalHours - remainingRegularHours;
+        }
+      }
+
+      const regularPay = Math.max(0, regularHours) * employee.hourly_rate;
+      const overtimeRate = employee.overtime_rate || (employee.hourly_rate * 1.5);
+      const overtimePay = Math.max(0, overtimeHours) * overtimeRate;
+      
+      updateData.total_hours = shiftTotalHours;
+      updateData.regular_hours = Math.max(0, regularHours);
+      updateData.overtime_hours = Math.max(0, overtimeHours);
+      updateData.gross_pay = regularPay + overtimePay;
+  } else {
+      updateData.total_hours = null;
+      updateData.regular_hours = null;
+      updateData.overtime_hours = null;
+      updateData.gross_pay = null;
+  }
+
+  const { error: updateError } = await _supabase
+    .from("time_entries")
+    .update(updateData)
+    .eq("id", editingEntryId);
+
+  if (updateError) {
+    alert("Failed to save changes: " + updateError.message);
+  } else {
+    alert("Entry updated successfully!");
+    closeEditModal();
+    await viewTimeEntries();
+    await updateDashboardMetrics();
+  }
+}
+
+async function adminCloseEntry(entryId) {
+    if (!confirm("Are you sure you want to close this time entry? This will clock the employee out at the current time.")) {
+        return;
+    }
+    
+    editingEntryId = entryId;
+    
+    const { data: entry, error: entryError } = await _supabase
+      .from("time_entries")
+      .select('clock_in')
+      .eq("id", editingEntryId)
+      .single();
+      
+    if (entryError || !entry) {
+      alert("Could not fetch entry to close it.");
+      return;
+    }
+    
+    function toLocalISOString(date) {
+        if (!date) return '';
+        const d = new Date(date);
+        const tzOffset = d.getTimezoneOffset() * 60000;
+        const localISOTime = new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
+        return localISOTime;
+    }
+
+    document.getElementById('editClockIn').value = toLocalISOString(parseDbTimestamp(entry.clock_in));
+    document.getElementById('editClockOut').value = toLocalISOString(new Date());
+    
+    await saveEditedEntry();
+}
+
+function closeReportModal() {
+  document.getElementById('reportModal').classList.add('hidden');
+}
+
+function exportReport() {
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setDate(endDate.getDate() - 6);
+  
+  const toYYYYMMDD = (d) => d.toISOString().split('T')[0];
+
+  document.getElementById('reportStartDate').value = toYYYYMMDD(startDate);
+  document.getElementById('reportEndDate').value = toYYYYMMDD(endDate);
+
+  document.getElementById('reportModal').classList.remove('hidden');
+}
+
+async function generateCSVReport() {
+  const startDateInput = document.getElementById('reportStartDate').value;
+  const endDateInput = document.getElementById('reportEndDate').value;
+
+  if (!startDateInput || !endDateInput) {
+    alert('Please select both a start and end date.');
+    return;
+  }
+
+  const startDate = new Date(startDateInput);
+  startDate.setHours(0, 0, 0, 0);
+
+  const endDate = new Date(endDateInput);
+  endDate.setHours(23, 59, 59, 999);
+
+  if (endDate < startDate) {
+    alert('End date cannot be earlier than start date.');
+    return;
+  }
+  
+  alert('Generating report... This may take a moment for large date ranges.');
+
+  const { data: entries, error } = await _supabase
+    .from('time_entries')
+    .select('*, employees(name, employee_id)')
+    .gte('clock_in', startDate.toISOString())
+    .lte('clock_in', endDate.toISOString())
+    .order('clock_in', { ascending: true });
+
+  if (error) {
+    alert('Error fetching report data: ' + error.message);
+    return;
+  }
+
+  if (entries.length === 0) {
+    alert('No time entries found in the selected date range.');
+    return;
+  }
+
+  let csvContent = "data:text/csv;charset=utf-8,";
+  const headers = [
+    "Employee ID",
+    "Employee Name",
+    "Clock In",
+    "Clock Out",
+    "Total Hours",
+    "Regular Hours",
+    "Overtime Hours",
+    "Gross Pay"
+  ];
+  csvContent += headers.join(",") + "\r\n";
+
+  entries.forEach(entry => {
+    const clockIn = entry.clock_in ? parseDbTimestamp(entry.clock_in).toLocaleString() : 'N/A';
+    const clockOut = entry.clock_out ? parseDbTimestamp(entry.clock_out).toLocaleString() : 'N/A';
+    const employeeId = entry.employees ? entry.employees.employee_id : 'N/A';
+    const employeeName = entry.employees ? entry.employees.name : 'N/A';
+
+    const row = [
+      employeeId,
+      `"${employeeName}"`,
+      `"${clockIn}"`,
+      `"${clockOut}"`,
+      entry.total_hours ? entry.total_hours.toFixed(4) : '0.00',
+      entry.regular_hours ? entry.regular_hours.toFixed(4) : '0.00',
+      entry.overtime_hours ? entry.overtime_hours.toFixed(4) : '0.00',
+      entry.gross_pay ? entry.gross_pay.toFixed(2) : '0.00'
+    ];
+    csvContent += row.join(",") + "\r\n";
+  });
+
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  const fileName = `time_report_${startDateInput}_to_${endDateInput}.csv`;
+  link.setAttribute("download", fileName);
+  document.body.appendChild(link);
+  
+  link.click();
+  document.body.removeChild(link);
+  closeReportModal();
+}
+
 async function viewTimeEntries() {
   const container = document.getElementById("adminActions");
   container.innerHTML = "<h3>Loading time entries...</h3>";
@@ -284,6 +625,7 @@ function initializeApp() {
 
     document.getElementById("adminPanel").classList.remove("hidden");
     document.getElementById("manageEmployeesPanel").classList.add("hidden");
+    document.getElementById("createAdminPanel").classList.add("hidden");
 
     updateDashboardMetrics();
 }

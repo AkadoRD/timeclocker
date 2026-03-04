@@ -1,8 +1,9 @@
-      const CACHE_NAME = "timeclocker-v10";
+      const CACHE_NAME = "timeclocker-v11";
       
       const urlsToCache = [
         "./",
         "index.html",
+        "admin.html",
         "manifest.json",
         "icons/icon-192.png",
         "icons/icon-512.png"
