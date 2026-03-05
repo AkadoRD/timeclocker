@@ -65,9 +65,30 @@ let allProjects = [];
 let confirmCallback = null;
 
 // --- UI & Utility Functions ---
-function showToast(message, type = 'success') { /* ... no changes ... */ }
-function showConfirmModal(title, message, onConfirm) { /* ... no changes ... */ }
-function hideConfirmModal() { /* ... no changes ... */ }
+function showToast(message, type = 'success') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.innerText = message;
+    container.appendChild(toast);
+    setTimeout(() => { toast.classList.add('show'); }, 10);
+    setTimeout(() => {
+        toast.classList.remove('show');
+        toast.addEventListener('transitionend', () => toast.remove());
+    }, 3000);
+}
+
+function showConfirmModal(title, message, onConfirm) {
+    document.getElementById('modal-title').innerText = title;
+    document.getElementById('modal-message').innerText = message;
+    confirmCallback = onConfirm;
+    document.getElementById('confirm-modal-overlay').style.display = 'flex';
+}
+
+function hideConfirmModal() {
+    document.getElementById('confirm-modal-overlay').style.display = 'none';
+    confirmCallback = null;
+}
 
 // --- Auth & Navigation ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -114,7 +135,8 @@ function goBack() {
 }
 
 async function fetchAllProjects() {
-    const { data, error } = await _supabase.from('projects').select('id, name').order('name');
+    const adminData = JSON.parse(sessionStorage.getItem('adminData'));
+    const { data, error } = await _supabase.from('projects').select('id, name').eq('client_id', adminData.id).order('name');
     if (error) {
         console.error("Error fetching projects:", error);
         allProjects = [];
@@ -129,9 +151,80 @@ function logout() {
 }
 
 // --- PROJECT MANAGEMENT ---
-async function renderProjectsList(editProjectId = null, currentName = '') { /* ... same as before ... */ }
-async function saveProject() { /* ... same as before ... */ }
-async function deleteProject(projectId) { /* ... same as before ... */ }
+async function renderProjectsList(editProjectId = null, currentName = '') {
+    const panel = document.getElementById('manageProjectsPanel');
+    panel.innerHTML = '<h2>Manage Projects</h2><p>Loading...</p>';
+    await fetchAllProjects(); // Refresh project list
+
+    let formHtml = `
+        <div class="form-container">
+            <h3>${editProjectId ? 'Edit Project' : 'Create New Project'}</h3>
+            <input type="hidden" id="projectId" value="${editProjectId || ''}">
+            <input type="text" id="projectName" placeholder="Project Name" value="${currentName}">
+            <button onclick="saveProject()">${editProjectId ? 'Save Changes' : 'Create Project'}</button>
+            ${editProjectId ? `<button onclick="renderProjectsList()" class="secondary">Cancel Edit</button>` : ''}
+        </div>`;
+
+    let tableHtml = `
+        <h3>Existing Projects</h3>
+        <table>
+            <tr><th>Project Name</th><th>Actions</th></tr>
+            ${allProjects.map(p => `
+                <tr>
+                    <td>${p.name}</td>
+                    <td>
+                        <button onclick="renderProjectsList('${p.id}', '${p.name}')" class="secondary">Edit</button>
+                        <button onclick="deleteProject('${p.id}','${p.name}')" class="warning">Delete</button>
+                    </td>
+                </tr>`).join('')}
+        </table>`;
+
+    panel.innerHTML = `
+        <h2>Manage Projects</h2>
+        <button onclick="goBack()" class="secondary">Back</button>
+        ${formHtml}
+        ${tableHtml}
+    `;
+}
+
+async function saveProject() {
+    const projectId = document.getElementById('projectId').value;
+    const projectName = document.getElementById('projectName').value.trim();
+
+    if (!projectName) {
+        showToast('Project name cannot be empty.', 'error');
+        return;
+    }
+    
+    let response;
+    if (projectId) { // Update existing project
+        response = await _supabase.from('projects').update({ name: projectName }).eq('id', projectId);
+    } else { // Create new project
+        const adminData = JSON.parse(sessionStorage.getItem('adminData'));
+        const clientId = adminData.id;
+        response = await _supabase.from('projects').insert([{ name: projectName, client_id: clientId }]).select();
+    }
+
+    if (response.error) {
+        showToast('Error: ' + response.error.message, 'error');
+    } else {
+        showToast(projectId ? 'Project updated!' : 'Project created!', 'success');
+        renderProjectsList();
+    }
+}
+
+async function deleteProject(projectId, name) {
+    showConfirmModal(`Delete ${name}`, `Are you sure you want to delete project \"${name}\"? This cannot be undone.`, async () => {
+        const { error } = await _supabase.from('projects').delete().eq('id', projectId);
+        if (error) {
+            showToast('Error: ' + error.message, 'error');
+        } else {
+            showToast('Project deleted.', 'success');
+            renderProjectsList();
+        }
+    });
+}
+
 
 // --- EMPLOYEE MANAGEMENT (CRUD) ---
 async function renderEmployeeList() {
@@ -140,7 +233,7 @@ async function renderEmployeeList() {
     await fetchAllProjects();
     const adminData = JSON.parse(sessionStorage.getItem('adminData'));
     const { data: employees, error } = await _supabase.from('employees').select('*, project:projects(name)').eq('client_id', adminData.id).order('employee_id');
-    if (error) { /* handle error */ return; }
+    if (error) { panel.innerHTML += `<p style="color:red">${error.message}</p>`; return; }
 
     let projectOptions = allProjects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
     
@@ -272,7 +365,7 @@ async function deleteEmployee(dbId, name) {
     });
 }
 
-// --- TIME ENTRY & REPORTS (No changes, full code included) ---
+// --- TIME ENTRY & REPORTS ---
 async function renderTimeEntries() {
     const panel = document.getElementById('timeEntriesPanel');
     panel.innerHTML = '<h2>Time Entries</h2><p>Loading...</p>';
