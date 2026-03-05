@@ -155,12 +155,12 @@ async function validateAdmin() {
   // Step 2: Use the admin's ID to find their associated client
   const { data: client, error: clientError } = await _supabase
     .from("clients")
-    .select("id") // Get the client's ID
-    .eq("admin_id", adminUser.id) // Assumption: 'clients' table has an 'admin_id' linking to the admin's 'id'
+    .select("id") 
+    .eq("owner_id", adminUser.id) // FINAL ATTEMPT: Using owner_id based on admin's "owner" role
     .single();
 
   if (clientError || !client) {
-    alert("This admin account is not linked to a client company.");
+    alert("This admin account is not linked to a client company. Please check the database configuration.");
     document.getElementById("adminPinInput").value = "";
     return;
   }
@@ -175,7 +175,6 @@ async function validateAdmin() {
   sessionStorage.setItem('adminData', JSON.stringify(adminData));
   window.location.href = 'admin.html';
 }
-
 
 </script>
 </body>
