@@ -139,39 +139,43 @@ async function validateAdmin() {
   const pin = document.getElementById("adminPinInput").value.trim();
   if (!pin) return;
 
-  const { data, error } = await _supabase
+  // Step 1: Get admin user data using PIN
+  const { data: adminUser, error: adminError } = await _supabase
     .from("admins")
-    .select("*")
+    .select("id, name")
     .eq("pin", pin)
     .single();
 
-  if (error) {
-    alert(`An error occurred: ${error.message}`);
+  if (adminError || !adminUser) {
+    alert("Incorrect PIN or admin account issue.");
     document.getElementById("adminPinInput").value = "";
     return;
   }
 
-  if (!data) {
-    alert("No admin found with that PIN.");
+  // Step 2: Use the admin's ID to find their associated client
+  const { data: client, error: clientError } = await _supabase
+    .from("clients")
+    .select("id") // Get the client's ID
+    .eq("admin_id", adminUser.id) // Assumption: 'clients' table has an 'admin_id' linking to the admin's 'id'
+    .single();
+
+  if (clientError || !client) {
+    alert("This admin account is not linked to a client company.");
     document.getElementById("adminPinInput").value = "";
     return;
   }
-
-  // Show the data and stop
-  alert(`Admin data received: ${JSON.stringify(data)}`);
-  document.getElementById("adminPinInput").value = "";
-
-  /*
+  
+  // Step 3: Success! Prepare data and redirect
   const adminData = {
-      name: data.name,
-      client_id: data.client_id
+      name: adminUser.name,
+      client_id: client.id
   };
   
   sessionStorage.setItem('adminAuthenticated', 'true');
   sessionStorage.setItem('adminData', JSON.stringify(adminData));
   window.location.href = 'admin.html';
-  */
 }
+
 
 </script>
 </body>
