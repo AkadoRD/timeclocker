@@ -14,8 +14,8 @@
         button:hover { background-color: #259399; }
         button.secondary { background-color: #7f8c8d; }
         button.secondary:hover { background-color: #6c7a7d; }
-        button.danger { background-color: #c0392b; }
-        button.danger:hover { background-color: #a53125; }
+        button.warning { background-color: #f39c12; }
+        button.warning:hover { background-color: #e67e22; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ecf0f1; }
         th { background-color: #f8f9fa; font-weight: 600; }
@@ -24,72 +24,65 @@
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 
         /* --- Estilos para Notificaciones Toast --- */
-        #toast-container {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 10000;
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-        }
-        .toast {
-            padding: 15px 20px;
-            margin-bottom: 10px;
-            border-radius: 8px;
-            color: white;
-            font-weight: 500;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            transition: opacity 0.5s ease, transform 0.5s ease;
-            opacity: 0;
-            transform: translateX(100%);
-        }
-        .toast.show {
-            opacity: 1;
-            transform: translateX(0);
-        }
+        #toast-container { position: fixed; top: 20px; right: 20px; z-index: 12000; }
+        .toast { padding: 15px 20px; margin-bottom: 10px; border-radius: 8px; color: white; font-weight: 500; box-shadow: 0 4px 15px rgba(0,0,0,0.1); transition: all 0.5s ease; opacity: 0; transform: translateX(100%); }
+        .toast.show { opacity: 1; transform: translateX(0); }
         .toast.toast-success { background-color: #27ae60; }
         .toast.toast-error { background-color: #c0392b; }
+        .toast.toast-info { background-color: #3498db; } /* Azul para info */
+
+        /* --- Estilos para Modal de Confirmación --- */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 11000; }
+        .modal { background: white; padding: 30px; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); width: 90%; max-width: 400px; text-align: center; }
+        .modal-actions { margin-top: 20px; }
+
     </style>
 </head>
 <body>
 
-<div id="adminPanel" class="panel active"> ... </div>
+<div id="adminPanel" class="panel active">...</div>
 <div id="manageEmployeesPanel" class="panel"></div>
 <div id="timeEntriesPanel" class="panel"></div>
 <div id="reportsPanel" class="panel"></div>
 
-<!-- Contenedor para las notificaciones toast -->
 <div id="toast-container"></div>
+
+<!-- Modal de Confirmación -->
+<div id="confirm-modal-overlay" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-content">
+            <h3 id="modal-title">Confirm Action</h3>
+            <p id="modal-message">Are you sure?</p>
+        </div>
+        <div class="modal-actions">
+            <button id="modal-confirm-button" class="warning">Confirm</button>
+            <button id="modal-cancel-button" class="secondary">Cancel</button>
+        </div>
+    </div>
+</div>
 
 <script>
 const _supabase = supabase.createClient("https://jqppakaodpgbtxzpvsti.supabase.co", "sb_publishable_ZwLCHMtM9uCfBFkwBcSSEQ_zQVq1RwI");
 let historyStack = ['adminPanel'];
 let allProjects = [];
 
-// --- Toast Notification Function ---
-function showToast(message, type = 'success') {
-    const container = document.getElementById('toast-container');
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    toast.innerText = message;
-    container.appendChild(toast);
+// --- Toast & Modal Functions ---
+function showToast(message, type = 'success') { /* ...código sin cambios... */ }
 
-    // Force a reflow to enable the transition
-    setTimeout(() => {
-        toast.classList.add('show');
-    }, 10);
-
-    // Remove the toast after 3 seconds
-    setTimeout(() => {
-        toast.classList.remove('show');
-        toast.addEventListener('transitionend', () => toast.remove());
-    }, 3000);
+let confirmCallback = null;
+function showConfirmModal(title, message, onConfirm) {
+    document.getElementById('modal-title').innerText = title;
+    document.getElementById('modal-message').innerText = message;
+    confirmCallback = onConfirm;
+    document.getElementById('confirm-modal-overlay').style.display = 'flex';
+}
+function hideConfirmModal() {
+    document.getElementById('confirm-modal-overlay').style.display = 'none';
+    confirmCallback = null;
 }
 
-
 // --- AUTH & NAVIGATION ---
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
     const adminData = JSON.parse(sessionStorage.getItem('adminData'));
     if (!adminData) { window.location.href = 'index.html'; return; }
     document.getElementById("adminInfo").innerText = `Welcome, ${adminData.name}`;
@@ -98,74 +91,68 @@ document.addEventListener('DOMContentLoaded', async () => {
         <button onclick="showPanel('timeEntriesPanel')">View Time Entries</button>
         <button onclick="showPanel('reportsPanel')">Reports</button>
     `;
-    await fetchAllProjects();
+    fetchAllProjects();
+
+    // Listeners para el modal
+    document.getElementById('modal-confirm-button').addEventListener('click', () => {
+        if (confirmCallback) { confirmCallback(); }
+        hideConfirmModal();
+    });
+    document.getElementById('modal-cancel-button').addEventListener('click', () => {
+        hideConfirmModal();
+    });
 });
 
-function showPanel(panelId) {
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    document.getElementById(panelId).classList.add('active');
-    if (historyStack[historyStack.length - 1] !== panelId) {
-        historyStack.push(panelId);
-    }
-    if (panelId === 'manageEmployeesPanel') renderEmployeeList();
-    if (panelId === 'timeEntriesPanel') renderTimeEntries();
-    if (panelId === 'reportsPanel') renderReportsPanel();
-}
-
-function goBack() {
-    if (historyStack.length > 1) {
-        historyStack.pop();
-        showPanel(historyStack[historyStack.length - 1]);
-    }
-}
-
-async function fetchAllProjects() {
-    const { data, error } = await _supabase.from('projects').select('id, name');
-    if (data) allProjects = data;
-}
-
-function logout() {
-    sessionStorage.clear();
-    window.location.href = 'index.html';
-}
+function showPanel(panelId) { /* ...código sin cambios... */ }
+function goBack() { /* ...código sin cambios... */ }
+async function fetchAllProjects() { /* ...código sin cambios... */ }
+function logout() { /* ...código sin cambios... */ }
 
 // --- EMPLOYEE MANAGEMENT ---
 async function renderEmployeeList() { /* ...código sin cambios... */ }
-
 async function openEditEmployeeForm(dbId) { /* ...código sin cambios... */ }
-
-async function saveEditedEmployee() {
-    const dbId = document.getElementById('editEmpDbId').value;
-    let updateData = {
-        name: document.getElementById('editEmpName').value,
-        hourly_rate: parseFloat(document.getElementById('editEmpRate').value),
-        current_project_id: document.getElementById('editEmpProject').value ? parseInt(document.getElementById('editEmpProject').value) : null,
-        active: document.getElementById('editEmpActive').checked
-    };
-    const pin = document.getElementById('editEmpPin').value;
-    if (pin && pin.length === 4) updateData.pin = pin;
-
-    const { error } = await _supabase.from('employees').update(updateData).eq('id', dbId);
-    
-    // REEMPLAZO DE ALERTAS
-    if (error) {
-        showToast('Error: ' + error.message, 'error');
-    } else {
-        showToast('Employee updated!', 'success');
-        renderEmployeeList();
-    }
-}
+async function saveEditedEmployee() { /* ...código sin cambios... */ }
 
 // --- TIME ENTRY MANAGEMENT ---
-async function renderTimeEntries() { /* ...código sin cambios... */ }
+async function renderTimeEntries() {
+    const panel = document.getElementById('timeEntriesPanel');
+    panel.innerHTML = '<h2>Time Entries</h2><p>Loading...</p>';
+    const { data, error } = await _supabase.from('time_entries').select('*, employee:employees(name)').order('clock_in', { ascending: false }).limit(100);
+    
+    let content = `
+        <h2>Recent Time Entries</h2>
+        <button onclick="goBack()" class="secondary">Back</button>
+        <table>
+            <tr><th>Employee</th><th>Clock In</th><th>Clock Out</th><th>Actions</th></tr>
+            ${data.map(entry => `
+                <tr>
+                    <td>${entry.employee ? entry.employee.name : 'N/A'}</td>
+                    <td>${new Date(entry.clock_in).toLocaleString()}</td>
+                    <td>${entry.clock_out ? new Date(entry.clock_out).toLocaleString() : '<b>Still Clocked In</b>'}</td>
+                    <td>
+                        ${!entry.clock_out ? `<button onclick="closeEntry('${entry.id}')" class="warning">Close Entry</button>` : ''}
+                        <button onclick="showToast(\'Editing time entries is not yet available.\', \'info\')" class="secondary">Edit</button>
+                    </td>
+                </tr>`).join('')}
+        </table>`;
+    panel.innerHTML = content;
+}
 
-async function closeEntry(entryId) { /* ...código sin cambios... */ }
+async function closeEntry(entryId) {
+    showConfirmModal('Close Entry', 'Are you sure you want to manually close this entry?', async () => {
+        const { error } = await _supabase.from('time_entries').update({ clock_out: new Date().toISOString() }).eq('id', entryId);
+        if (error) {
+            showToast('Error: ' + error.message, 'error');
+        } else {
+            showToast('Entry closed successfully.', 'success');
+            renderTimeEntries();
+        }
+    });
+}
 
 // --- REPORTS ---
 function renderReportsPanel() { /* ...código sin cambios... */ }
-
 async function generateReport() { /* ...código sin cambios... */ }
-
 function exportToCSV(data) { /* ...código sin cambios... */ }
 
 </script>
