@@ -1,4 +1,4 @@
-const CACHE_NAME = "timeclocker-v13";
+const CACHE_NAME = "timeclocker-v14";
 
 const urlsToCache = [
   "./",
@@ -14,7 +14,7 @@ self.addEventListener("install", event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
-        console.log("Archivos cacheados (v13)");
+        console.log("Archivos cacheados (v14)");
         return cache.addAll(urlsToCache);
       })
       .then(() => self.skipWaiting())
@@ -37,19 +37,11 @@ self.addEventListener("activate", event => {
   );
 });
 
-// Estrategia de Fetch (sin cambios)
+// Estrategia: Network falling back to cache
 self.addEventListener("fetch", event => {
-  const url = new URL(event.request.url);
-  const isIndex = event.request.mode === "navigate" || url.pathname.endsWith("/") || url.pathname.endsWith("index.html");
-  if (isIndex) {
-    event.respondWith(
-      fetch(event.request).catch(() => caches.match("index.html"))
-    );
-    return;
-  }
   event.respondWith(
-    caches.match(event.request)
-      .then(response => response || fetch(event.request))
-      .catch(() => event.request.mode === "navigate" ? caches.match("index.html") : null)
+    fetch(event.request).catch(() => {
+      return caches.match(event.request);
+    })
   );
 });
