@@ -1,0 +1,28 @@
+### Plan de Desarrollo de la App Time-Clock
+
+**Nivel 1: Funcionalidad en Tiempo Real (La Máxima Prioridad)**
+
+*   **Tarea 1: Implementar Suscripciones de Supabase Realtime.**
+    *   **Objetivo:** Modificar el `admin.html` para "escuchar" cambios en la base de datos. Cuando un empleado fiche (un `INSERT` en `time_entries`), la tabla en el panel del administrador se actualizará automáticamente sin necesidad de recargar la página.
+
+**Nivel 2: Mejoras Críticas de Seguridad y Funcionalidad**
+
+*   **Tarea 2: Requerir PIN para Empleados al Fichar.**
+    *   **Objetivo:** Añadir un campo de PIN en `index.html` para que, al hacer `clock-in` o `clock-out`, se verifique tanto el ID como el PIN del empleado.
+
+*   **Tarea 3: Mejorar el Modo Sin Conexión.**
+    *   **Objetivo:** Mejorar la lógica en `index.html` para que también guarde los fichajes de salida (`clock-out`) sin conexión y los sincronice después.
+
+**Nivel 3: Características Profesionales (Para Competir en el Mercado)**
+
+*   **Tarea 4: Captura de Geolocalización al Fichar.**
+    *   **Objetivo:** Guardar las coordenadas GPS del dispositivo en el momento del `clock-in` y `clock-out`.
+
+*   **Tarea 5: Autenticación de Administrador Robusta.**
+    *   **Objetivo:** Cambiar el sistema de PIN del administrador por un sistema de `email` y `contraseña` usando el módulo de Autenticación de Supabase.
+
+**Nivel 4: Despliegue y Mantenimiento**
+
+*   **Tarea 6: Configurar un Dominio Personalizado.**
+
+*   **Tarea 7: Proteger las Claves de la API (API Keys).**

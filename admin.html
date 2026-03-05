@@ -76,6 +76,7 @@ let historyStack = ['adminPanel'];
 let allProjects = [];
 let confirmCallback = null;
 let numericClientId = null;
+let timeEntriesSubscription = null;
 
 function showToast(message, type = 'success') {
     const container = document.getElementById('toast-container');
@@ -129,16 +130,35 @@ document.addEventListener('DOMContentLoaded', () => {
     showPanel('adminPanel');
 });
 
+function handleRealtimeUpdate(payload) {
+    console.log('Realtime update:', payload);
+    showToast('Time entries updated in real-time!', 'success');
+    renderTimeEntries();
+}
+
 function showPanel(panelId) {
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     document.getElementById(panelId)?.classList.add('active');
     if (historyStack[historyStack.length - 1] !== panelId) historyStack.push(panelId);
 
+    // Unsubscribe from previous real-time subscriptions
+    if (timeEntriesSubscription) {
+        _supabase.removeChannel(timeEntriesSubscription);
+        timeEntriesSubscription = null;
+    }
+
     const panelActions = {
         adminPanel: fetchAllProjects,
         manageEmployeesPanel: renderEmployeeList,
         manageProjectsPanel: renderProjectsList,
-        timeEntriesPanel: renderTimeEntries,
+        timeEntriesPanel: () => {
+            renderTimeEntries();
+            if (!timeEntriesSubscription) {
+                timeEntriesSubscription = _supabase.channel('public:time_entries')
+                    .on('postgres_changes', { event: '*', schema: 'public', table: 'time_entries' }, handleRealtimeUpdate)
+                    .subscribe();
+            }
+        },
         reportsPanel: renderReportsPanel
     };
     panelActions[panelId]?.();
@@ -152,6 +172,9 @@ function goBack() {
 
 function logout() {
     sessionStorage.clear();
+    if (timeEntriesSubscription) {
+        _supabase.removeChannel(timeEntriesSubscription);
+    }
     window.location.href = 'index.html';
 }
 
@@ -454,7 +477,8 @@ function exportToCSV(data) {
     const csv = [
         header.join(','),
         ...data.map(row => header.map(field => `"${String(row[field]).replace(/"/g, '""')}"`).join(','))
-    ].join('\r\n');
+    ].join('
+');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
