@@ -139,10 +139,10 @@ async function validateAdmin() {
     const pin = document.getElementById("adminPinInput").value.trim();
     if (!pin) return;
 
-    // Step 1: Validate admin PIN
+    // Step 1: Get admin user data
     const { data: adminUser, error: adminError } = await _supabase
         .from("admins")
-        .select("id, name, role")
+        .select("id, name, role, client_id")
         .eq("pin", pin)
         .single();
 
@@ -151,48 +151,56 @@ async function validateAdmin() {
         return;
     }
 
-    // Step 2: Find the associated client
-    let { data: client, error: clientError } = await _supabase
-        .from("clients")
-        .select("id")
-        .eq(adminUser.role === 'owner' ? 'owner_id' : 'admin_id', adminUser.id)
-        .maybeSingle();
+    let finalClientId = adminUser.client_id;
 
-    // Step 3: If no client is found, create one for the owner
-    if (!client && adminUser.role === 'owner') {
-        alert("No client company found for this owner. Creating a new one.");
+    // Step 2: If the admin is an owner and has no client, create one.
+    if (adminUser.role === 'owner' && !finalClientId) {
+        console.log("Owner has no client. Attempting to create one.");
+
+        // Create the client with only a name
         const { data: newClient, error: newClientError } = await _supabase
             .from('clients')
-            .insert({ 
-                name: `${adminUser.name}'s Company`, 
-                owner_id: adminUser.id 
-            })
+            .insert({ name: `${adminUser.name}'s Company` })
             .select('id')
             .single();
-        
+
         if (newClientError) {
             alert(`Failed to create a new client company: ${newClientError.message}`);
             return;
         }
-        client = newClient;
+        
+        console.log("New client created with ID:", newClient.id);
+        finalClientId = newClient.id;
+
+        // Now, update the admin user to link them to the new client
+        const { error: updateAdminError } = await _supabase
+            .from('admins')
+            .update({ client_id: finalClientId })
+            .eq('id', adminUser.id);
+        
+        if (updateAdminError) {
+            alert(`Failed to link admin to the new company: ${updateAdminError.message}`);
+            // You might want to delete the orphaned client here, but for now, just alert.
+            return;
+        }
+        console.log("Admin user successfully linked to the new client.");
     }
 
-    if (!client) {
-        alert("This admin account is not linked to a client company.");
+    if (!finalClientId) {
+        alert("This admin account is not linked to a client company and is not an owner.");
         return;
     }
 
-    // Step 4: Success, proceed to admin page
+    // Step 3: Success, proceed to admin page
     const adminData = {
         name: adminUser.name,
-        client_id: client.id
+        client_id: finalClientId
     };
     
     sessionStorage.setItem('adminAuthenticated', 'true');
     sessionStorage.setItem('adminData', JSON.stringify(adminData));
     window.location.href = 'admin.html';
 }
-
 
 </script>
 </body>
