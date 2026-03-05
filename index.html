@@ -4,21 +4,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <meta name="theme-color" content="#ffffff">
   <title>Employee Clock</title>
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" type="image/png" href="icons/icon-192.png">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-    // Scripts unchanged
     function isOnline() { return navigator.onLine; }
     if ("serviceWorker" in navigator) { window.addEventListener("load", () => { navigator.serviceWorker.register("./sw.js"); }); }
     function saveOfflineEntry(entry) { let p = JSON.parse(localStorage.getItem("pendingEntries"))||[]; p.push(entry); localStorage.setItem("pendingEntries",JSON.stringify(p)); }
-    async function syncOfflineEntries() { let p = JSON.parse(localStorage.getItem("pendingEntries"))||[]; if(p.length===0)return; const{error}=await _supabase.from("time_entries").insert(p); if(!error)localStorage.removeItem("pendingEntries"); }
+    async function syncOfflineEntries() { if(typeof _supabase === "undefined" || !isOnline()) return; let p = JSON.parse(localStorage.getItem("pendingEntries"))||[]; if(p.length===0)return; const{error}=await _supabase.from("time_entries").insert(p); if(!error)localStorage.removeItem("pendingEntries"); }
     window.addEventListener("online", syncOfflineEntries);
   </script>
   <style>
-    /* Styles unchanged, including the fix for number input arrows */
     body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f8f9fa; display: flex; align-items: center; justify-content: center; min-height: 100vh; user-select: none; touch-action: manipulation; }
     #mainCard { background: white; width: 90%; max-width: 450px; padding: 3rem 2rem; border-radius: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.05); text-align: center; }
     #clockContainer { margin-bottom: 2.5rem; }
@@ -29,7 +26,9 @@
     input#empId { width: 100%; padding: 1rem; font-size: 1.5rem; border: 2px solid #dcdde1; border-radius: 16px; text-align: center; box-sizing: border-box; }
     .button-group { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
     button { padding: 1.2rem; font-size: 1.1rem; font-weight: 600; border: none; border-radius: 14px; cursor: pointer; }
-    #msg { margin-top: 2rem; padding: 1rem; font-size: 1rem; min-height: 20px; display: flex; align-items: center; justify-content: center; border-radius: 12px; font-weight: 500; }
+    button[onclick="clockIn()"] { background-color: #eb8e55; color: white; }
+    button[onclick="clockOut()"] { background-color: #2cb3ba; color: white; }
+    #msg { margin-top: 2rem; padding: 1rem; font-size: 1rem; min-height: 20px; border-radius: 12px; font-weight: 500; }
     .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 10000; }
     .modal-content { background: white; padding: 20px; border-radius: 8px; text-align: center; }
     .hidden { display: none !important; }
@@ -39,35 +38,34 @@
 </head>
 <body>
 
-  <div id="mainCard">
-    <div id="clockContainer">
-      <div id="date"></div>
-      <div id="clock"></div>
-    </div>
-    <div class="input-group">
-      <label>Employee ID</label>
-      <input id="empId" type="number" placeholder="0000" oninput="if(this.value.length > 4) this.value = this.value.slice(0,4);">
-    </div>
-    <div class="button-group">
-      <button onclick="clockIn()">Clock In</button>
-      <button onclick="clockOut()">Clock Out</button>
-    </div>
-    <p id="msg"></p>
+<div id="mainCard">
+  <div id="clockContainer">
+    <div id="date"></div>
+    <div id="clock"></div>
   </div>
+  <div class="input-group">
+    <label>Employee ID</label>
+    <input id="empId" type="number" placeholder="0000" oninput="if(this.value.length > 4) this.value = this.value.slice(0,4);">
+  </div>
+  <div class="button-group">
+    <button onclick="clockIn()">Clock In</button>
+    <button onclick="clockOut()">Clock Out</button>
+  </div>
+  <p id="msg"></p>
+</div>
 
-  <!-- CORRECTED ADMIN MODAL -->
-  <div id="adminModal" class="modal hidden">
-    <div class="modal-content">
-      <h3>Enter Admin PIN</h3>
-      <input type="password" id="adminPinInput" placeholder="PIN" maxlength="4" inputmode="numeric" pattern="[0-9]*" />
-      <button onclick="validateAdmin()">Enter</button>
-      <button onclick="closeAdminModal()">Cancel</button>
-    </div>
+<div id="adminModal" class="modal hidden">
+  <div class="modal-content">
+    <h3>Enter Admin PIN</h3>
+    <input type="password" id="adminPinInput" placeholder="PIN" maxlength="4" inputmode="numeric" pattern="[0-9]*" />
+    <button onclick="validateAdmin()">Enter</button>
+    <button onclick="closeAdminModal()">Cancel</button>
   </div>
+</div>
 
 <script>
-// All Javascript logic is complete and correct.
 const _supabase = supabase.createClient("https://jqppakaodpgbtxzpvsti.supabase.co", "sb_publishable_ZwLCHMtM9uCfBFkwBcSSEQ_zQVq1RwI");
+
 document.addEventListener('DOMContentLoaded', () => {
     updateClock();
     setInterval(updateClock, 1000);
@@ -76,18 +74,55 @@ document.addEventListener('DOMContentLoaded', () => {
     let pressTimer = null;
     const startPress = () => { pressTimer = setTimeout(openAdmin, 3000); };
     const cancelPress = () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } };
-    clockElement.addEventListener("touchstart", startPress);
-    clockElement.addEventListener("touchend", cancelPress);
     clockElement.addEventListener("mousedown", startPress);
     clockElement.addEventListener("mouseup", cancelPress);
+    clockElement.addEventListener("touchstart", startPress);
+    clockElement.addEventListener("touchend", cancelPress);
 });
 
 function updateClock() {
   const now = new Date();
-  const timeOptions = { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true };
-  const dateOptions = { timeZone: "America/New_York", weekday: "long", year: "numeric", month: "long", day: "numeric" };
-  document.getElementById("clock").innerText = now.toLocaleTimeString("en-US", timeOptions);
-  document.getElementById("date").innerText = now.toLocaleDateString("en-US", dateOptions);
+  document.getElementById("clock").innerText = now.toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", hour12: true });
+  document.getElementById("date").innerText = now.toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "long", month: "long", day: "numeric" });
+}
+
+function resetUI() {
+    document.getElementById("empId").value = "";
+    document.getElementById("msg").innerText = "";
+}
+
+async function clockIn() {
+    const empId = document.getElementById("empId").value.trim();
+    if (empId === "9999") { openAdmin(); return; }
+    if (!empId) { alert("Please enter an Employee ID."); return; }
+    const msg = document.getElementById("msg");
+    msg.innerText = "Processing...";
+    if (isOnline()) {
+        const { data: openEntry } = await _supabase.from("time_entries").select("id").eq("employee_id", empId).is("clock_out", null).maybeSingle();
+        if (openEntry) { msg.innerText = "You are already clocked in."; return; }
+        const { data: employee } = await _supabase.from("employees").select("current_project_id").eq("employee_id", empId).eq("active", true).single();
+        if (!employee) { msg.innerText = "Employee not found or inactive."; return; }
+        const { error } = await _supabase.from("time_entries").insert([{ employee_id: empId, clock_in: new Date().toISOString(), project_id: employee.current_project_id }]);
+        if (error) { msg.innerText = `Error: ${error.message}`; } 
+        else { msg.innerText = "Checked In!"; setTimeout(resetUI, 2000); }
+    } else {
+        saveOfflineEntry({ employee_id: empId, clock_in: new Date().toISOString(), project_id: null });
+        msg.innerText = "Saved offline (no project assigned).";
+        setTimeout(resetUI, 2000);
+    }
+}
+
+async function clockOut() {
+    const empId = document.getElementById("empId").value.trim();
+    if (!empId) { alert("Please enter an Employee ID."); return; }
+    if (!isOnline()) { alert("Clock-out requires an internet connection."); return; }
+    const msg = document.getElementById("msg");
+    msg.innerText = "Processing...";
+    const { data: openEntry } = await _supabase.from("time_entries").select("id").eq("employee_id", empId).is("clock_out", null).maybeSingle();
+    if (!openEntry) { msg.innerText = "No active clock-in found."; return; }
+    const { error } = await _supabase.from("time_entries").update({ clock_out: new Date().toISOString() }).eq("id", openEntry.id);
+    if (error) { msg.innerText = `Error: ${error.message}`; } 
+    else { msg.innerText = "Clocked Out!"; setTimeout(resetUI, 2000); }
 }
 
 function openAdmin() {
@@ -104,18 +139,11 @@ async function validateAdmin() {
   const pin = document.getElementById("adminPinInput").value.trim();
   if (!pin) return;
   const { data, error } = await _supabase.from("admins").select("*").eq("pin", pin).single();
-  if (error || !data) {
-    alert("Incorrect PIN or admin not found.");
-    document.getElementById("adminPinInput").value = "";
-    return;
-  }
-  if (!data.active) { alert("This admin account is inactive."); return; }
+  if (error || !data) { alert("Incorrect PIN."); return; }
   sessionStorage.setItem('adminAuthenticated', 'true');
   sessionStorage.setItem('adminData', JSON.stringify(data));
   window.location.href = 'admin.html';
 }
-
-// The rest of the JS functions (clockIn, clockOut, etc.) are correct and don't need to be pasted again.
 
 </script>
 </body>
