@@ -152,20 +152,24 @@ async function validateAdmin() {
     return;
   }
 
-  // Diagnostic Step: Fetch and show the structure of the first client
+  // Final Diagnostic Step: Fetch the first client to see its structure.
   const { data: clientData, error: clientError } = await _supabase
     .from("clients")
     .select("*")
-    .limit(1)
-    .single();
+    .limit(1);
 
-  if (clientError || !clientData) {
-      alert("Could not fetch any data from the 'clients' table. Error: " + (clientError ? clientError.message : "No clients found."));
+  if (clientError) {
+      alert("Could not fetch data from the 'clients' table. Error: " + clientError.message);
+      return;
+  }
+
+  if (!clientData || clientData.length === 0) {
+      alert("Could not fetch data from the 'clients' table because it is empty.");
       return;
   }
   
-  // Show the structure and stop
-  alert(`Client table structure received: ${JSON.stringify(clientData)}`);
+  // Show the structure of the first client and stop
+  alert(`Client table structure received: ${JSON.stringify(clientData[0])}`);
   document.getElementById("adminPinInput").value = "";
 }
 
