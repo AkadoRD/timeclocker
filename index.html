@@ -145,8 +145,20 @@ async function validateAdmin() {
     .eq("pin", pin)
     .single();
 
-  if (error || !data || !data.clients || !Array.isArray(data.clients) || data.clients.length === 0) {
-    alert("Incorrect PIN or admin account is not configured correctly.");
+  if (error) {
+    alert(`Error de Supabase: ${error.message}`);
+    document.getElementById("adminPinInput").value = "";
+    return;
+  }
+
+  if (!data) {
+    alert("PIN incorrecto. No se encontró ningún administrador con ese PIN.");
+    document.getElementById("adminPinInput").value = "";
+    return;
+  }
+
+  if (!data.clients || !Array.isArray(data.clients) || data.clients.length === 0) {
+    alert("La cuenta de administrador no está configurada correctamente. No tiene clientes asociados.");
     document.getElementById("adminPinInput").value = "";
     return;
   }
