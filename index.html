@@ -103,7 +103,7 @@ async function clockIn() {
         const { data: employee } = await _supabase.from("employees").select("current_project_id, client_id").eq("employee_id", empId).eq("active", true).single();
         if (!employee) { msg.innerText = "Employee not found or inactive."; return; }
         const { error } = await _supabase.from("time_entries").insert([{ employee_id: empId, clock_in: new Date().toISOString(), project_id: employee.current_project_id, client_id: employee.client_id }]);
-        if (error) { msg.innerText = `Error: ${error.message}`; } 
+        if (error) { msg.innerText = \`Error: \${error.message}\`; } 
         else { msg.innerText = "Checked In!"; setTimeout(resetUI, 2000); }
     } else {
         saveOfflineEntry({ employee_id: empId, clock_in: new Date().toISOString(), project_id: null, client_id: null }); // client_id will be null offline
@@ -121,7 +121,7 @@ async function clockOut() {
     const { data: openEntry } = await _supabase.from("time_entries").select("id").eq("employee_id", empId).is("clock_out", null).maybeSingle();
     if (!openEntry) { msg.innerText = "No active clock-in found."; return; }
     const { error } = await _supabase.from("time_entries").update({ clock_out: new Date().toISOString() }).eq("id", openEntry.id);
-    if (error) { msg.innerText = `Error: ${error.message}`; } 
+    if (error) { msg.innerText = \`Error: \${error.message}\`; } 
     else { msg.innerText = "Clocked Out!"; setTimeout(resetUI, 2000); }
 }
 
@@ -139,6 +139,7 @@ async function validateAdmin() {
     const pin = document.getElementById("adminPinInput").value.trim();
     if (!pin) return;
 
+    // 1. Find the admin by PIN
     const { data: adminUser, error: adminError } = await _supabase
         .from("admins")
         .select("id, name, role")
@@ -150,44 +151,51 @@ async function validateAdmin() {
         return;
     }
 
-    // Based on the final evidence, the link MUST be in the clients table.
+    // 2. Find the client company linked to this admin
+    // THIS WILL WORK ONCE YOU ADD THE `admin_id` COLUMN
     let { data: client, error: clientError } = await _supabase
         .from("clients")
         .select("id")
-        .eq("admin_id", adminUser.id) // Final attempt using the most logical column name
+        .eq("admin_id", adminUser.id)
         .maybeSingle();
+    
+    // Handle potential errors (like the column not existing yet)
+    if (clientError) {
+        alert(`Database error: Could not check for client. Have you added the 'admin_id' column to the 'clients' table? Error: \${clientError.message}`);
+        return;
+    }
 
     let finalClientId = client ? client.id : null;
 
+    // 3. If the admin is an 'owner' and has no company, create one
     if (adminUser.role === 'owner' && !finalClientId) {
-
         const { data: newClient, error: newClientError } = await _supabase
             .from('clients')
             .insert({ 
-                name: `${adminUser.name}'s Company`, 
-                admin_id: adminUser.id // This is the critical correction
+                name: \`\${adminUser.name}'s Company\`, 
+                admin_id: adminUser.id // THIS IS THE CRITICAL LINK
             })
             .select('id')
             .single();
         
         if (newClientError) {
-            alert(`Failed to create and link a new client company: ${newClientError.message}`);
+            alert(\`Failed to create and link new client company. Have you added the 'admin_id' column? Error: \${newClientError.message}\`);
             return;
         }
         finalClientId = newClient.id;
     }
 
     if (!finalClientId) {
-        alert("This admin account is not linked to a client company.");
+        alert("This admin account is not linked to a client company and is not an 'owner'.");
         return;
     }
 
+    // 4. Success! Save data and redirect
     const adminData = {
         name: adminUser.name,
-        client_id: finalClientId
+        client_id: finalClientId // The correct numeric client ID
     };
     
-    sessionStorage.setItem('adminAuthenticated', 'true');
     sessionStorage.setItem('adminData', JSON.stringify(adminData));
     window.location.href = 'admin.html';
 }
