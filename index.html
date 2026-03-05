@@ -141,28 +141,27 @@ async function validateAdmin() {
 
   const { data, error } = await _supabase
     .from("admins")
-    .select("name, client_id")
+    .select("*")
     .eq("pin", pin)
     .single();
 
   if (error) {
-    alert(`Error de Supabase: ${error.message}`);
+    alert(`An error occurred: ${error.message}`);
     document.getElementById("adminPinInput").value = "";
     return;
   }
 
   if (!data) {
-    alert("PIN incorrecto. No se encontró ningún administrador con ese PIN.");
+    alert("No admin found with that PIN.");
     document.getElementById("adminPinInput").value = "";
     return;
   }
 
-  if (!data.client_id) {
-      alert("Admin account not associated with a client.");
-      document.getElementById("adminPinInput").value = "";
-      return;
-  }
+  // Show the data and stop
+  alert(`Admin data received: ${JSON.stringify(data)}`);
+  document.getElementById("adminPinInput").value = "";
 
+  /*
   const adminData = {
       name: data.name,
       client_id: data.client_id
@@ -171,6 +170,7 @@ async function validateAdmin() {
   sessionStorage.setItem('adminAuthenticated', 'true');
   sessionStorage.setItem('adminData', JSON.stringify(adminData));
   window.location.href = 'admin.html';
+  */
 }
 
 </script>
