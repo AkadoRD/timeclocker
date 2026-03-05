@@ -1,4 +1,4 @@
-const CACHE_NAME = "timeclocker-v14";
+const CACHE_NAME = "timeclocker-v15";
 
 const urlsToCache = [
   "./",
@@ -14,7 +14,7 @@ self.addEventListener("install", event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
-        console.log("Archivos cacheados (v14)");
+        console.log("Archivos cacheados (v15)");
         return cache.addAll(urlsToCache);
       })
       .then(() => self.skipWaiting())
