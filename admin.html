@@ -8,7 +8,8 @@
   <link rel="icon" type="image/png" href="icons/icon-192.png">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 20px; background-color: #f8f9fa; }
+    /* DIAGNOSTIC CHANGE: Background is now LIGHT RED */
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 20px; background-color: #ffdddd; }
     .hidden { display: none !important; }
     .panel { background: white; padding: 20px; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.08); max-width: 800px; margin: 20px auto; }
     button { background-color: #2cb3ba; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-size: 1rem; margin: 5px; }
@@ -97,13 +98,11 @@
 let editingEmployeeId = null;
 let currentClientIdForProjects = null;
 
-// --- NAVIGATION & INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', initializeApp);
 
 function initializeApp() {
     const adminData = JSON.parse(sessionStorage.getItem('adminData'));
     if (!adminData) { logout(); return; }
-    // CORRECTED LINE: Used adminData.name instead of admin.name
     document.getElementById("adminInfo").innerText = `Welcome ${adminData.name} (${adminData.role})`;
     const actions = document.getElementById("adminActions");
     actions.innerHTML = `
@@ -123,7 +122,6 @@ function logout() {
   window.location.href = 'index.html';
 }
 
-// --- CLIENT MANAGEMENT ---
 async function manageClients() {
   document.querySelectorAll('.panel').forEach(p => p.id === 'manageClientsPanel' ? p.classList.remove('hidden') : p.classList.add('hidden'));
   await renderClientList();
@@ -134,12 +132,10 @@ async function renderClientList() {
     container.innerHTML = "<h3>Loading...</h3>";
     const { data, error } = await _supabase.from("clients").select("*").order("name");
     let html = "<table><tr><th>Name</th><th>Status</th><th>Actions</th></tr>";
-    data.forEach(c => { html += `<tr><td>${c.name}</td><td>${c.active ? 'Active' : 'Inactive'}</td><td><button onclick="manageProjects('${c.id}', '${c.name.replace(/'/g, "\\'")}')">Projects</button></td></tr>`; });
+    data.forEach(c => { html += `<tr><td>${c.name}</td><td>${c.active ? 'Active' : 'Inactive'}</td><td><button onclick="manageProjects('${c.id}', '${c.name.replace(/'/g, "\'")}')">Projects</button></td></tr>`; });
     container.innerHTML = html + "</table>";
 }
-//... other client functions omitted for brevity, but they exist in the full file
 
-// --- PROJECT MANAGEMENT ---
 async function manageProjects(clientId, clientName) {
   currentClientIdForProjects = clientId;
   document.querySelectorAll('.panel').forEach(p => p.id === 'manageProjectsPanel' ? p.classList.remove('hidden') : p.classList.add('hidden'));
@@ -155,9 +151,7 @@ async function renderProjectList(clientId) {
     data.forEach(p => { html += `<tr><td>${p.name}</td><td>${p.active ? 'Active' : 'Inactive'}</td><td>...</td></tr>`; });
     container.innerHTML = html + "</table>";
 }
-//... other project functions
 
-// --- EMPLOYEE MANAGEMENT ---
 async function manageEmployees() {
   document.querySelectorAll('.panel').forEach(p => p.id === 'manageEmployeesPanel' ? p.classList.remove('hidden') : p.classList.add('hidden'));
   await renderEmployeeList();
@@ -189,6 +183,7 @@ async function populateProjectDropdown(selectElementId) {
         selectEl.appendChild(optgroup);
     }
 }
+
 async function openEditEmployeeForm(employeeId) {
     editingEmployeeId = employeeId;
     const { data, error } = await _supabase.from("employees").select("*").eq("id", employeeId).single();
@@ -201,6 +196,7 @@ async function openEditEmployeeForm(employeeId) {
     document.getElementById("editEmployeeFormContainer").classList.remove("hidden");
     document.getElementById("employeeListContainer").classList.add("hidden");
 }
+
 async function saveEditedEmployee() {
   let updateData = {
       name: document.getElementById("editEmpName").value,
@@ -213,8 +209,6 @@ async function saveEditedEmployee() {
   const { error } = await _supabase.from("employees").update(updateData).eq("id", editingEmployeeId);
   if (error) { alert("Error: " + error.message); } else { showAdminDashboard(); }
 }
-// ... other functions like cancelEditEmployee, showNewEmployeeForm, etc.
-
 </script>
 </body>
 </html>
