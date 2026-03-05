@@ -136,42 +136,63 @@ function closeAdminModal() {
 }
 
 async function validateAdmin() {
-  const pin = document.getElementById("adminPinInput").value.trim();
-  if (!pin) return;
+    const pin = document.getElementById("adminPinInput").value.trim();
+    if (!pin) return;
 
-  // Step 1: Get admin user data using PIN (This works)
-  const { data: adminUser, error: adminError } = await _supabase
-    .from("admins")
-    .select("id, name")
-    .eq("pin", pin)
-    .single();
+    // Step 1: Validate admin PIN
+    const { data: adminUser, error: adminError } = await _supabase
+        .from("admins")
+        .select("id, name, role")
+        .eq("pin", pin)
+        .single();
 
-  if (adminError || !adminUser) {
-    alert("Incorrect PIN or admin account issue.");
-    document.getElementById("adminPinInput").value = "";
-    return;
-  }
+    if (adminError || !adminUser) {
+        alert("Incorrect PIN or admin account issue.");
+        return;
+    }
 
-  // Final Diagnostic Step: Fetch the first client to see its structure.
-  const { data: clientData, error: clientError } = await _supabase
-    .from("clients")
-    .select("*")
-    .limit(1);
+    // Step 2: Find the associated client
+    let { data: client, error: clientError } = await _supabase
+        .from("clients")
+        .select("id")
+        .eq(adminUser.role === 'owner' ? 'owner_id' : 'admin_id', adminUser.id)
+        .maybeSingle();
 
-  if (clientError) {
-      alert("Could not fetch data from the 'clients' table. Error: " + clientError.message);
-      return;
-  }
+    // Step 3: If no client is found, create one for the owner
+    if (!client && adminUser.role === 'owner') {
+        alert("No client company found for this owner. Creating a new one.");
+        const { data: newClient, error: newClientError } = await _supabase
+            .from('clients')
+            .insert({ 
+                name: `${adminUser.name}'s Company`, 
+                owner_id: adminUser.id 
+            })
+            .select('id')
+            .single();
+        
+        if (newClientError) {
+            alert(`Failed to create a new client company: ${newClientError.message}`);
+            return;
+        }
+        client = newClient;
+    }
 
-  if (!clientData || clientData.length === 0) {
-      alert("Could not fetch data from the 'clients' table because it is empty.");
-      return;
-  }
-  
-  // Show the structure of the first client and stop
-  alert(`Client table structure received: ${JSON.stringify(clientData[0])}`);
-  document.getElementById("adminPinInput").value = "";
+    if (!client) {
+        alert("This admin account is not linked to a client company.");
+        return;
+    }
+
+    // Step 4: Success, proceed to admin page
+    const adminData = {
+        name: adminUser.name,
+        client_id: client.id
+    };
+    
+    sessionStorage.setItem('adminAuthenticated', 'true');
+    sessionStorage.setItem('adminData', JSON.stringify(adminData));
+    window.location.href = 'admin.html';
 }
+
 
 </script>
 </body>
