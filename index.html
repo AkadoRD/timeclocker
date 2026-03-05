@@ -139,7 +139,6 @@ async function validateAdmin() {
     const pin = document.getElementById("adminPinInput").value.trim();
     if (!pin) return;
 
-    // Step 1: Get admin user data
     const { data: adminUser, error: adminError } = await _supabase
         .from("admins")
         .select("id, name, role")
@@ -147,54 +146,42 @@ async function validateAdmin() {
         .single();
 
     if (adminError || !adminUser) {
-        alert("Incorrect PIN or admin account issue. Please double-check your PIN and try again.");
+        alert("Incorrect PIN or admin account issue.");
         return;
     }
 
-    // Step 2: Try to find a client link in a join table.
-    let { data: clientLink } = await _supabase
-        .from("admins_clients") // Corrected table name based on schema feedback
-        .select("client_id")
-        .eq("admin_id", adminUser.id)
+    // Based on the final evidence, the link MUST be in the clients table.
+    let { data: client, error: clientError } = await _supabase
+        .from("clients")
+        .select("id")
+        .eq("admin_id", adminUser.id) // Final attempt using the most logical column name
         .maybeSingle();
 
-    let finalClientId = clientLink ? clientLink.client_id : null;
+    let finalClientId = client ? client.id : null;
 
-    // Step 3: If the admin is an owner and has no client, create the full association.
     if (adminUser.role === 'owner' && !finalClientId) {
-        console.log("Owner has no client. Attempting to create one and link it.");
 
-        // Create the client first
         const { data: newClient, error: newClientError } = await _supabase
             .from('clients')
-            .insert({ name: `${adminUser.name}'s Company` })
+            .insert({ 
+                name: `${adminUser.name}'s Company`, 
+                admin_id: adminUser.id // This is the critical correction
+            })
             .select('id')
             .single();
-
+        
         if (newClientError) {
-            alert(`Failed to create a new client company: ${newClientError.message}`);
+            alert(`Failed to create and link a new client company: ${newClientError.message}`);
             return;
         }
-        
         finalClientId = newClient.id;
-
-        // Now, create the link in the join table
-        const { error: newLinkError } = await _supabase
-            .from('admins_clients') // Corrected table name
-            .insert({ admin_id: adminUser.id, client_id: finalClientId });
-        
-        if (newLinkError) {
-            alert(`Failed to link admin to the new company: ${newLinkError.message}.`);
-            return;
-        }
     }
 
     if (!finalClientId) {
-        alert("This admin account is not linked to a client company and cannot be automatically configured.");
+        alert("This admin account is not linked to a client company.");
         return;
     }
 
-    // Step 4: Success, proceed to admin page
     const adminData = {
         name: adminUser.name,
         client_id: finalClientId
