@@ -142,7 +142,7 @@ async function validateAdmin() {
     // Step 1: Get admin user data
     const { data: adminUser, error: adminError } = await _supabase
         .from("admins")
-        .select("id, name, role") // Corrected SELECT - no longer causes PIN error
+        .select("id, name, role")
         .eq("pin", pin)
         .single();
 
@@ -153,7 +153,7 @@ async function validateAdmin() {
 
     // Step 2: Try to find a client link in a join table.
     let { data: clientLink } = await _supabase
-        .from("client_admin") // Final hypothesis for table name
+        .from("admins_clients") // Corrected table name based on schema feedback
         .select("client_id")
         .eq("admin_id", adminUser.id)
         .maybeSingle();
@@ -180,11 +180,11 @@ async function validateAdmin() {
 
         // Now, create the link in the join table
         const { error: newLinkError } = await _supabase
-            .from('client_admin') // Use the same hypothesized table name
+            .from('admins_clients') // Corrected table name
             .insert({ admin_id: adminUser.id, client_id: finalClientId });
         
         if (newLinkError) {
-            alert(`Failed to link admin to the new company: ${newLinkError.message}. The new company was created but could not be linked. This is a database configuration issue.`);
+            alert(`Failed to link admin to the new company: ${newLinkError.message}.`);
             return;
         }
     }
