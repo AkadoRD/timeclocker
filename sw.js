@@ -1,4 +1,4 @@
-const CACHE_NAME = "timeclocker-v16";
+const CACHE_NAME = "timeclocker-v17";
 
 const urlsToCache = [
   "./",
@@ -14,7 +14,7 @@ self.addEventListener("install", event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
-        console.log("Archivos cacheados (v16)");
+        console.log("Archivos cacheados (v17)");
         return cache.addAll(urlsToCache);
       })
       .then(() => self.skipWaiting())
@@ -37,11 +37,40 @@ self.addEventListener("activate", event => {
   );
 });
 
-// Estrategia: Network falling back to cache
+// Servir desde cache, o si no, desde la red
 self.addEventListener("fetch", event => {
+  // No cachear las peticiones a la API de Supabase
+  if (event.request.url.includes("supabase.co")) {
+    return event.respondWith(fetch(event.request));
+  }
+
   event.respondWith(
-    fetch(event.request).catch(() => {
-      return caches.match(event.request);
-    })
+    caches.match(event.request)
+      .then(response => {
+        // Si el recurso está en caché, lo devolvemos
+        if (response) {
+          return response;
+        }
+        // Si no, lo pedimos a la red
+        return fetch(event.request).then(
+          res => {
+            // Verificamos que la respuesta sea válida
+            if(!res || res.status !== 200 || res.type !== 'basic') {
+              return res;
+            }
+
+            // Clonamos la respuesta. Una respuesta es un 'Stream' y solo se puede consumir una vez.
+            // Necesitamos una copia para el navegador y otra para la caché.
+            const responseToCache = res.clone();
+
+            caches.open(CACHE_NAME)
+              .then(cache => {
+                cache.put(event.request, responseToCache);
+              });
+
+            return res;
+          }
+        );
+      })
   );
 });
