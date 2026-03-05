@@ -100,13 +100,13 @@ async function clockIn() {
     if (isOnline()) {
         const { data: openEntry } = await _supabase.from("time_entries").select("id").eq("employee_id", empId).is("clock_out", null).maybeSingle();
         if (openEntry) { msg.innerText = "You are already clocked in."; return; }
-        const { data: employee } = await _supabase.from("employees").select("current_project_id").eq("employee_id", empId).eq("active", true).single();
+        const { data: employee } = await _supabase.from("employees").select("current_project_id, client_id").eq("employee_id", empId).eq("active", true).single();
         if (!employee) { msg.innerText = "Employee not found or inactive."; return; }
-        const { error } = await _supabase.from("time_entries").insert([{ employee_id: empId, clock_in: new Date().toISOString(), project_id: employee.current_project_id }]);
+        const { error } = await _supabase.from("time_entries").insert([{ employee_id: empId, clock_in: new Date().toISOString(), project_id: employee.current_project_id, client_id: employee.client_id }]);
         if (error) { msg.innerText = `Error: ${error.message}`; } 
         else { msg.innerText = "Checked In!"; setTimeout(resetUI, 2000); }
     } else {
-        saveOfflineEntry({ employee_id: empId, clock_in: new Date().toISOString(), project_id: null });
+        saveOfflineEntry({ employee_id: empId, clock_in: new Date().toISOString(), project_id: null, client_id: null }); // client_id will be null offline
         msg.innerText = "Saved offline (no project assigned).";
         setTimeout(resetUI, 2000);
     }
@@ -138,10 +138,26 @@ function closeAdminModal() {
 async function validateAdmin() {
   const pin = document.getElementById("adminPinInput").value.trim();
   if (!pin) return;
-  const { data, error } = await _supabase.from("admins").select("*").eq("pin", pin).single();
-  if (error || !data) { alert("Incorrect PIN."); return; }
+  
+  const { data, error } = await _supabase
+    .from("admins")
+    .select("name, clients ( id )")
+    .eq("pin", pin)
+    .single();
+
+  if (error || !data || !data.clients || !data.clients.id) {
+    alert("Incorrect PIN or admin account is not configured correctly.");
+    document.getElementById("adminPinInput").value = "";
+    return;
+  }
+
+  const adminData = {
+      name: data.name,
+      client_id: data.clients.id
+  };
+  
   sessionStorage.setItem('adminAuthenticated', 'true');
-  sessionStorage.setItem('adminData', JSON.stringify(data));
+  sessionStorage.setItem('adminData', JSON.stringify(adminData));
   window.location.href = 'admin.html';
 }
 
