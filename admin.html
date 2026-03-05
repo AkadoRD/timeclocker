@@ -24,30 +24,34 @@
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 
         /* --- Estilos para Notificaciones Toast --- */
-        #toast-container { position: fixed; top: 20px; right: 20px; z-index: 12000; }
+        #toast-container { position: fixed; top: 20px; right: 20px; z-index: 12000; display: flex; flex-direction: column; align-items: flex-end; }
         .toast { padding: 15px 20px; margin-bottom: 10px; border-radius: 8px; color: white; font-weight: 500; box-shadow: 0 4px 15px rgba(0,0,0,0.1); transition: all 0.5s ease; opacity: 0; transform: translateX(100%); }
         .toast.show { opacity: 1; transform: translateX(0); }
         .toast.toast-success { background-color: #27ae60; }
         .toast.toast-error { background-color: #c0392b; }
-        .toast.toast-info { background-color: #3498db; } /* Azul para info */
+        .toast.toast-info { background-color: #3498db; }
 
         /* --- Estilos para Modal de Confirmación --- */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 11000; }
         .modal { background: white; padding: 30px; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); width: 90%; max-width: 400px; text-align: center; }
         .modal-actions { margin-top: 20px; }
-
     </style>
 </head>
 <body>
 
-<div id="adminPanel" class="panel active">...</div>
+<div id="adminPanel" class="panel active">
+    <h2>Admin Dashboard</h2>
+    <p id="adminInfo"></p>
+    <div id="adminActions"></div>
+    <button onclick="logout()" class="warning">Logout</button>
+</div>
+
 <div id="manageEmployeesPanel" class="panel"></div>
 <div id="timeEntriesPanel" class="panel"></div>
 <div id="reportsPanel" class="panel"></div>
 
 <div id="toast-container"></div>
 
-<!-- Modal de Confirmación -->
 <div id="confirm-modal-overlay" class="modal-overlay">
     <div class="modal">
         <div class="modal-content">
@@ -65,23 +69,33 @@
 const _supabase = supabase.createClient("https://jqppakaodpgbtxzpvsti.supabase.co", "sb_publishable_ZwLCHMtM9uCfBFkwBcSSEQ_zQVq1RwI");
 let historyStack = ['adminPanel'];
 let allProjects = [];
-
-// --- Toast & Modal Functions ---
-function showToast(message, type = 'success') { /* ...código sin cambios... */ }
-
 let confirmCallback = null;
+
+function showToast(message, type = 'success') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.innerText = message;
+    container.appendChild(toast);
+    setTimeout(() => { toast.classList.add('show'); }, 10);
+    setTimeout(() => {
+        toast.classList.remove('show');
+        toast.addEventListener('transitionend', () => toast.remove());
+    }, 3000);
+}
+
 function showConfirmModal(title, message, onConfirm) {
     document.getElementById('modal-title').innerText = title;
     document.getElementById('modal-message').innerText = message;
     confirmCallback = onConfirm;
     document.getElementById('confirm-modal-overlay').style.display = 'flex';
 }
+
 function hideConfirmModal() {
     document.getElementById('confirm-modal-overlay').style.display = 'none';
     confirmCallback = null;
 }
 
-// --- AUTH & NAVIGATION ---
 document.addEventListener('DOMContentLoaded', () => {
     const adminData = JSON.parse(sessionStorage.getItem('adminData'));
     if (!adminData) { window.location.href = 'index.html'; return; }
@@ -93,7 +107,6 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
     fetchAllProjects();
 
-    // Listeners para el modal
     document.getElementById('modal-confirm-button').addEventListener('click', () => {
         if (confirmCallback) { confirmCallback(); }
         hideConfirmModal();
@@ -103,21 +116,117 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-function showPanel(panelId) { /* ...código sin cambios... */ }
-function goBack() { /* ...código sin cambios... */ }
-async function fetchAllProjects() { /* ...código sin cambios... */ }
-function logout() { /* ...código sin cambios... */ }
+function showPanel(panelId) {
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById(panelId).classList.add('active');
+    if (historyStack[historyStack.length - 1] !== panelId) {
+        historyStack.push(panelId);
+    }
+    if (panelId === 'manageEmployeesPanel') renderEmployeeList();
+    if (panelId === 'timeEntriesPanel') renderTimeEntries();
+    if (panelId === 'reportsPanel') renderReportsPanel();
+}
 
-// --- EMPLOYEE MANAGEMENT ---
-async function renderEmployeeList() { /* ...código sin cambios... */ }
-async function openEditEmployeeForm(dbId) { /* ...código sin cambios... */ }
-async function saveEditedEmployee() { /* ...código sin cambios... */ }
+function goBack() {
+    if (historyStack.length > 1) {
+        historyStack.pop();
+        const lastPanel = historyStack[historyStack.length - 1];
+        showPanel(lastPanel);
+    }
+}
 
-// --- TIME ENTRY MANAGEMENT ---
+async function fetchAllProjects() {
+    const { data, error } = await _supabase.from('projects').select('id, name');
+    if (data) allProjects = data;
+}
+
+function logout() {
+    sessionStorage.clear();
+    window.location.href = 'index.html';
+}
+
+async function renderEmployeeList() {
+    const panel = document.getElementById('manageEmployeesPanel');
+    panel.innerHTML = '<h2>Manage Employees</h2><p>Loading...</p>';
+    const { data, error } = await _supabase.from('employees').select('*, project:projects(name)').order('employee_id');
+    let projectOptions = allProjects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    
+    let content = `
+        <h2>Manage Employees</h2>
+        <button onclick="goBack()" class="secondary">Back</button>
+        <div id="editEmployeeFormContainer" style="display:none; margin-top:20px; padding:20px; border:1px solid #eee; border-radius:10px;">
+            <h3>Edit Employee</h3>
+            <input type="hidden" id="editEmpDbId">
+            <div class="form-grid">
+                <div>ID: <input type="text" id="editEmpId" readonly></div>
+                <div>Name: <input type="text" id="editEmpName"></div>
+                <div>Hourly Rate: <input type="number" id="editEmpRate"></div>
+                <div>PIN (4-digits): <input type="password" id="editEmpPin" placeholder="Leave blank to keep same"></div>
+                <div>Project: <select id="editEmpProject"><option value="">None</option>${projectOptions}</select></div>
+                <div><label><input type="checkbox" id="editEmpActive"> Active</label></div>
+            </div>
+            <button onclick="saveEditedEmployee()">Save Changes</button>
+            <button onclick="document.getElementById('editEmployeeFormContainer').style.display='none'" class="secondary">Cancel</button>
+        </div>
+        <table>
+            <tr><th>ID</th><th>Name</th><th>Current Project</th><th>Status</th><th>Actions</th></tr>
+            ${data.map(emp => `
+                <tr>
+                    <td>${emp.employee_id}</td>
+                    <td>${emp.name}</td>
+                    <td>${emp.project ? emp.project.name : 'None'}</td>
+                    <td>${emp.active ? 'Active' : 'Inactive'}</td>
+                    <td><button onclick="openEditEmployeeForm('${emp.id}')">Edit</button></td>
+                </tr>`).join('')}
+        </table>`;
+    panel.innerHTML = content;
+}
+
+async function openEditEmployeeForm(dbId) {
+    const { data, error } = await _supabase.from('employees').select('*').eq('id', dbId).single();
+    if(error) { showToast('Error fetching employee data.', 'error'); return; }
+    document.getElementById('editEmpDbId').value = data.id;
+    document.getElementById('editEmpId').value = data.employee_id;
+    document.getElementById('editEmpName').value = data.name;
+    document.getElementById('editEmpRate').value = data.hourly_rate;
+    document.getElementById('editEmpProject').value = data.current_project_id || '';
+    document.getElementById('editEmpActive').checked = data.active;
+    document.getElementById('editEmpPin').value = '';
+    document.getElementById('editEmployeeFormContainer').style.display = 'block';
+}
+
+async function saveEditedEmployee() {
+    const dbId = document.getElementById('editEmpDbId').value;
+    let updateData = {
+        name: document.getElementById('editEmpName').value,
+        hourly_rate: parseFloat(document.getElementById('editEmpRate').value),
+        current_project_id: document.getElementById('editEmpProject').value ? parseInt(document.getElementById('editEmpProject').value) : null,
+        active: document.getElementById('editEmpActive').checked
+    };
+    const pin = document.getElementById('editEmpPin').value;
+    if (pin && pin.length > 0) {
+        if (pin.length === 4 && /^\d+$/.test(pin)) {
+            updateData.pin = pin;
+        } else {
+            showToast('PIN must be 4 digits.', 'error');
+            return;
+        }
+    }
+
+    const { error } = await _supabase.from('employees').update(updateData).eq('id', dbId);
+    if (error) { 
+        showToast('Error: ' + error.message, 'error'); 
+    } else { 
+        showToast('Employee updated!', 'success'); 
+        renderEmployeeList(); 
+    }
+}
+
 async function renderTimeEntries() {
     const panel = document.getElementById('timeEntriesPanel');
     panel.innerHTML = '<h2>Time Entries</h2><p>Loading...</p>';
     const { data, error } = await _supabase.from('time_entries').select('*, employee:employees(name)').order('clock_in', { ascending: false }).limit(100);
+    if(error) { panel.innerHTML = '<p style="color:red;">Error loading entries.</p>'; return; }
     
     let content = `
         <h2>Recent Time Entries</h2>
@@ -131,7 +240,7 @@ async function renderTimeEntries() {
                     <td>${entry.clock_out ? new Date(entry.clock_out).toLocaleString() : '<b>Still Clocked In</b>'}</td>
                     <td>
                         ${!entry.clock_out ? `<button onclick="closeEntry('${entry.id}')" class="warning">Close Entry</button>` : ''}
-                        <button onclick="showToast(\'Editing time entries is not yet available.\', \'info\')" class="secondary">Edit</button>
+                        <button onclick="showToast('Editing time entries is not yet available.', 'info')" class="secondary">Edit</button>
                     </td>
                 </tr>`).join('')}
         </table>`;
@@ -150,11 +259,75 @@ async function closeEntry(entryId) {
     });
 }
 
-// --- REPORTS ---
-function renderReportsPanel() { /* ...código sin cambios... */ }
-async function generateReport() { /* ...código sin cambios... */ }
-function exportToCSV(data) { /* ...código sin cambios... */ }
+function renderReportsPanel() {
+    const panel = document.getElementById('reportsPanel');
+    panel.innerHTML = `
+        <h2>Reports</h2>
+        <button onclick="goBack()" class="secondary">Back</button>
+        <div class="form-grid" style="margin-top:20px;">
+            <div>Start Date: <input type="date" id="startDate"></div>
+            <div>End Date: <input type="date" id="endDate"></div>
+        </div>
+        <button onclick="generateReport()">Generate Report</button>
+        <div id="reportResult" style="margin-top:20px;"></div>
+    `;
+}
 
+async function generateReport() {
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    if (!startDate || !endDate) { showToast('Please select a start and end date.', 'error'); return; }
+
+    const resultDiv = document.getElementById('reportResult');
+    resultDiv.innerHTML = '<p>Generating...</p>';
+
+    const { data, error } = await _supabase.from('time_entries')
+        .select('*, employee:employees(name, hourly_rate), project:projects(name)')
+        .gte('clock_in', startDate)
+        .lte('clock_in', new Date(endDate).toISOString().replace('T00:00:00.000Z', 'T23:59:59.999Z'))
+        .order('clock_in');
+
+    if (error) { resultDiv.innerHTML = `<p style="color:red">Error: ${error.message}</p>`; return; }
+    if (data.length === 0) { resultDiv.innerHTML = '<p>No entries found for this period.</p>'; return; }
+
+    let table = '<table><tr><th>Employee</th><th>Project</th><th>Clock In</th><th>Clock Out</th><th>Duration (H)</th><th>Pay</th></tr>';
+    let totalPay = 0;
+    let csvData = [['Employee', 'Project', 'Clock In', 'Clock Out', 'Duration Hours', 'Pay']];
+
+    data.forEach(entry => {
+        if (!entry.clock_out || !entry.employee) return;
+        const clockIn = new Date(entry.clock_in);
+        const clockOut = new Date(entry.clock_out);
+        const durationMs = clockOut - clockIn;
+        const durationHours = durationMs / 3600000;
+        const pay = durationHours * (entry.employee.hourly_rate || 0);
+        totalPay += pay;
+
+        table += `<tr>
+            <td>${entry.employee.name}</td>
+            <td>${entry.project ? entry.project.name : 'N/A'}</td>
+            <td>${clockIn.toLocaleString()}</td>
+            <td>${clockOut.toLocaleString()}</td>
+            <td>${durationHours.toFixed(2)}</td>
+            <td>$${pay.toFixed(2)}</td>
+        </tr>`;
+        csvData.push([entry.employee.name, entry.project ? entry.project.name : 'N/A', clockIn.toISOString(), clockOut.toISOString(), durationHours.toFixed(2), pay.toFixed(2)]);
+    });
+
+    table += `<tr><td colspan="5" style="text-align:right;font-weight:bold;">Total Payroll:</td><td style="font-weight:bold;">$${totalPay.toFixed(2)}</td></tr></table>`;
+    resultDiv.innerHTML = `<button onclick="exportToCSV(JSON.parse(decodeURIComponent('${encodeURIComponent(JSON.stringify(csvData))}')))">Export to CSV</button>${table}`;
+}
+
+function exportToCSV(data) {
+    let csvContent = "data:text/csv;charset=utf-8," + data.map(e => e.join(",")).join("\\n");
+    var encodedUri = encodeURI(csvContent);
+    var link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "report.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
 </script>
 </body>
 </html>
