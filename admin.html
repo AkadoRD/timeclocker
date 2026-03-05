@@ -12,7 +12,7 @@
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 20px; background-color: #f8f9fa; color: #333; }
         .panel { background: white; padding: 25px; border-radius: 16px; box-shadow: 0 8px 30px rgba(0,0,0,0.07); max-width: 900px; margin: 20px auto; display: none; }
         .panel.active { display: block; }
-        button { background-color: #2cb3ba; color: white; border: none; padding: 12px 18px; border-radius: 10px; cursor: pointer; font-size: 1rem; font-weight: 500; margin: 5px; transition: background-color 0.2s; }
+        button { background-color: #2cb3ba; color: white; border: none; padding: 12px 18px; border-radius: 10px; cursor: pointer; font-size: 1rem; font-weight: 500; margin: 5px; transition: background-color: 0.2s; }
         button:hover { background-color: #259399; }
         button.secondary { background-color: #7f8c8d; }
         button.secondary:hover { background-color: #6c7a7d; }
@@ -130,22 +130,51 @@ document.addEventListener('DOMContentLoaded', () => {
     showPanel('adminPanel');
 });
 
-function handleRealtimeUpdate(payload) {
-    console.log('Realtime update:', payload);
-    showToast('Time entries updated in real-time!', 'success');
-    renderTimeEntries();
-}
-
-function showPanel(panelId) {
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    document.getElementById(panelId)?.classList.add('active');
-    if (historyStack[historyStack.length - 1] !== panelId) historyStack.push(panelId);
-
-    // Unsubscribe from previous real-time subscriptions
+function unsubscribeFromTimeEntries() {
     if (timeEntriesSubscription) {
         _supabase.removeChannel(timeEntriesSubscription);
         timeEntriesSubscription = null;
     }
+}
+
+function subscribeToTimeEntries() {
+    if (timeEntriesSubscription) return; // Already subscribed
+
+    timeEntriesSubscription = _supabase.channel('time-entries-channel')
+        .on(
+            'postgres_changes',
+            { 
+                event: '*', 
+                schema: 'public', 
+                table: 'time_entries', 
+                filter: `client_id=eq.${numericClientId}`
+            },
+            (payload) => {
+                console.log('Realtime change received!', payload);
+                showToast('Time entries updated live!');
+                if (document.getElementById('timeEntriesPanel').classList.contains('active')) {
+                    renderTimeEntries();
+                }
+            }
+        )
+        .subscribe((status, err) => {
+            if (status === 'SUBSCRIBED') {
+                console.log('Successfully subscribed to real-time entries.');
+            } else if (err) {
+                console.error('Realtime subscription error:', err);
+                showToast('Live update connection failed.', 'error');
+            }
+        });
+}
+
+function showPanel(panelId) {
+    if (panelId !== 'timeEntriesPanel') {
+        unsubscribeFromTimeEntries();
+    }
+
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById(panelId)?.classList.add('active');
+    if (historyStack[historyStack.length - 1] !== panelId) historyStack.push(panelId);
 
     const panelActions = {
         adminPanel: fetchAllProjects,
@@ -153,28 +182,44 @@ function showPanel(panelId) {
         manageProjectsPanel: renderProjectsList,
         timeEntriesPanel: () => {
             renderTimeEntries();
-            if (!timeEntriesSubscription) {
-                timeEntriesSubscription = _supabase.channel('public:time_entries')
-                    .on('postgres_changes', { event: '*', schema: 'public', table: 'time_entries' }, handleRealtimeUpdate)
-                    .subscribe();
-            }
+            subscribeToTimeEntries();
         },
         reportsPanel: renderReportsPanel
     };
-    panelActions[panelId]?.();
+    
+    if (panelActions[panelId]) {
+        panelActions[panelId]();
+    } else {
+        console.error("Unknown panel ID:", panelId);
+    }
 }
 
 function goBack() {
     if (historyStack.length <= 1) return;
     historyStack.pop();
-    showPanel(historyStack[historyStack.length - 1]);
+    const prevPanelId = historyStack[historyStack.length - 1];
+    // When going back, we don't want to push to history, so call directly
+    if (prevPanelId !== 'timeEntriesPanel') {
+        unsubscribeFromTimeEntries();
+    }
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById(prevPanelId)?.classList.add('active');
+    const panelActions = {
+        adminPanel: fetchAllProjects,
+        manageEmployeesPanel: renderEmployeeList,
+        manageProjectsPanel: renderProjectsList,
+        timeEntriesPanel: () => {
+            renderTimeEntries();
+            subscribeToTimeEntries();
+        },
+        reportsPanel: renderReportsPanel
+    };
+    if (panelActions[prevPanelId]) panelActions[prevPanelId]();
 }
 
 function logout() {
     sessionStorage.clear();
-    if (timeEntriesSubscription) {
-        _supabase.removeChannel(timeEntriesSubscription);
-    }
+    unsubscribeFromTimeEntries();
     window.location.href = 'index.html';
 }
 
@@ -356,16 +401,20 @@ async function deleteEmployee(dbId, name) {
 
 async function renderTimeEntries() {
     const panel = document.getElementById('timeEntriesPanel');
-    panel.innerHTML = '<h2>Recent Time Entries</h2><p>Loading...</p>';
-    const { data, error } = await _supabase.from('time_entries').select('*, employee:employees(name)').eq('client_id', numericClientId).order('clock_in', { ascending: false }).limit(100);
-    if(error) { panel.innerHTML += `<p style="color:red">${error.message}</p>`; return; }
-    
-    panel.innerHTML = `
+    // Retain the header and back button while loading new data
+    const headerHTML = `
         <h2>Recent Time Entries</h2>
         <button onclick="goBack()" class="secondary">Back</button>
+    `;
+    panel.innerHTML = headerHTML + '<p>Loading...</p>';
+
+    const { data, error } = await _supabase.from('time_entries').select('*, employee:employees(name)').eq('client_id', numericClientId).order('clock_in', { ascending: false }).limit(100);
+    if(error) { panel.innerHTML = headerHTML + `<p style="color:red">${error.message}</p>`; return; }
+    
+    const tableHTML = `
         <table>
             <thead><tr><th>Employee</th><th>Clock In</th><th>Clock Out</th><th>Actions</th></tr></thead>
-            <tbody>
+            <tbody id="time-entries-tbody">
             ${data.map(entry => `
                 <tr>
                     <td>${entry.employee ? entry.employee.name : 'N/A'}</td>
@@ -378,6 +427,7 @@ async function renderTimeEntries() {
                 </tr>`).join('')}
             </tbody>
         </table>`;
+    panel.innerHTML = headerHTML + tableHTML;
 }
 
 function toLocalISOString(date) {
@@ -407,14 +457,16 @@ async function saveTimeEntry() {
     } else {
         showToast('Time entry updated!', 'success');
         document.getElementById('edit-entry-modal-overlay').style.display = 'none';
-        renderTimeEntries();
+        // The real-time subscription will handle the re-render
     }
 }
 
 async function closeEntry(entryId) {
     const { error } = await _supabase.from('time_entries').update({ clock_out: new Date().toISOString() }).eq('id', entryId);
     if (error) showToast('Error: ' + error.message, 'error');
-    else { showToast('Entry closed.', 'success'); renderTimeEntries(); }
+    else { showToast('Entry closed.', 'success');
+    // The real-time subscription will handle the re-render
+   }
 }
 
 function renderReportsPanel() {
@@ -477,8 +529,7 @@ function exportToCSV(data) {
     const csv = [
         header.join(','),
         ...data.map(row => header.map(field => `"${String(row[field]).replace(/"/g, '""')}"`).join(','))
-    ].join('
-');
+    ].join('\r\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
