@@ -145,8 +145,14 @@ async function validateAdmin() {
     .eq("pin", pin)
     .single();
 
-  if (error || !data) {
-    alert("Incorrect PIN or admin account is not configured correctly.");
+  if (error) {
+    alert(`Error de Supabase: ${error.message}`);
+    document.getElementById("adminPinInput").value = "";
+    return;
+  }
+
+  if (!data) {
+    alert("PIN incorrecto. No se encontró ningún administrador con ese PIN.");
     document.getElementById("adminPinInput").value = "";
     return;
   }
