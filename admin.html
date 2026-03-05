@@ -26,8 +26,6 @@
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .form-container { margin-top:20px; padding:20px; border:1px solid #eee; border-radius:10px; background:#fdfdfd; }
         #employeeFormContainer { display: none; }
-
-        /* --- Toast & Modal Styles --- */
         #toast-container { position: fixed; top: 20px; right: 20px; z-index: 12000; }
         .toast { padding: 15px 20px; margin-bottom: 10px; border-radius: 8px; color: white; font-weight: 500; box-shadow: 0 4px 15px rgba(0,0,0,0.1); transition: all 0.5s ease; opacity: 0; transform: translateX(100%); }
         .toast.show { opacity: 1; transform: translateX(0); }
@@ -77,13 +75,12 @@ const _supabase = supabase.createClient("https://jqppakaodpgbtxzpvsti.supabase.c
 let historyStack = ['adminPanel'];
 let allProjects = [];
 let confirmCallback = null;
-let numericClientId = null; 
+let numericClientId = null;
 
-// --- UI & Utility Functions ---
 function showToast(message, type = 'success') {
     const container = document.getElementById('toast-container');
     const toast = document.createElement('div');
-    toast.className = \`toast toast-$-{type}\`;
+    toast.className = `toast toast-${type}`;
     toast.innerText = message;
     container.appendChild(toast);
     setTimeout(() => { toast.classList.add('show'); }, 10);
@@ -108,7 +105,6 @@ function hideConfirmModal() {
 document.getElementById('modal-confirm-button').addEventListener('click', () => { if (confirmCallback) confirmCallback(); hideConfirmModal(); });
 document.getElementById('modal-cancel-button').addEventListener('click', hideConfirmModal);
 
-// --- Auth & Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
     const adminData = JSON.parse(sessionStorage.getItem('adminData'));
     if (!adminData || !adminData.client_id) {
@@ -121,7 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const adminPanel = document.getElementById('adminPanel');
     adminPanel.innerHTML = `
         <h2>Admin Dashboard</h2>
-        <p>Welcome, $-{adminData.name}</p>
+        <p>Welcome, ${adminData.name}</p>
         <div id="adminActions">
             <button onclick="showPanel('manageEmployeesPanel')">Manage Employees</button>
             <button onclick="showPanel('manageProjectsPanel')">Manage Projects</button>
@@ -133,7 +129,6 @@ document.addEventListener('DOMContentLoaded', () => {
     showPanel('adminPanel');
 });
 
-// --- Navigation ---
 function showPanel(panelId) {
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     document.getElementById(panelId)?.classList.add('active');
@@ -160,14 +155,12 @@ function logout() {
     window.location.href = 'index.html';
 }
 
-// --- Data Fetching ---
 async function fetchAllProjects() {
     if (!numericClientId) return;
     const { data, error } = await _supabase.from('projects').select('id, name').eq('client_id', numericClientId).order('name');
     allProjects = error ? [] : data;
 }
 
-// --- PROJECT MANAGEMENT ---
 async function renderProjectsList(editProjectId = null, currentName = '') {
     const panel = document.getElementById('manageProjectsPanel');
     panel.innerHTML = '<h2>Manage Projects</h2><p>Loading...</p>';
@@ -177,23 +170,25 @@ async function renderProjectsList(editProjectId = null, currentName = '') {
         <h2>Manage Projects</h2>
         <button onclick="goBack()" class="secondary">Back</button>
         <div class="form-container">
-            <h3>$-{editProjectId ? 'Edit Project' : 'Create New Project'}</h3>
-            <input type="hidden" id="projectId" value="$-{editProjectId || ''}">
-            <input type="text" id="projectName" placeholder="Project Name" value="$-{currentName}">
-            <button onclick="saveProject()">$-{editProjectId ? 'Save Changes' : 'Create Project'}</button>
-            $-{editProjectId ? `<button onclick="renderProjectsList()" class="secondary">Cancel Edit</button>` : ''}
+            <h3>${editProjectId ? 'Edit Project' : 'Create New Project'}</h3>
+            <input type="hidden" id="projectId" value="${editProjectId || ''}">
+            <input type="text" id="projectName" placeholder="Project Name" value="${currentName}">
+            <button onclick="saveProject()">${editProjectId ? 'Save Changes' : 'Create Project'}</button>
+            ${editProjectId ? `<button onclick="renderProjectsList()" class="secondary">Cancel Edit</button>` : ''}
         </div>
         <h3>Existing Projects</h3>
         <table>
-            <tr><th>Project Name</th><th>Actions</th></tr>
-            $-{allProjects.map(p => `
+            <thead><tr><th>Project Name</th><th>Actions</th></tr></thead>
+            <tbody>
+            ${allProjects.map(p => `
                 <tr>
-                    <td>$-{p.name}</td>
+                    <td>${p.name}</td>
                     <td>
-                        <button onclick="renderProjectsList('$-{p.id}', '$-{p.name}')" class="secondary">Edit</button>
-                        <button onclick="deleteProject('$-{p.id}','$-{p.name}')" class="warning">Delete</button>
+                        <button onclick="renderProjectsList('${p.id}', '${p.name}')" class="secondary">Edit</button>
+                        <button onclick="deleteProject('${p.id}','${p.name}')" class="warning">Delete</button>
                     </td>
                 </tr>`).join('')}
+            </tbody>
         </table>`;
 }
 
@@ -214,22 +209,21 @@ async function saveProject() {
 }
 
 async function deleteProject(projectId, name) {
-    showConfirmModal(\`Delete $-{name}\`, \`Are you sure?\`, async () => {
+    showConfirmModal(`Delete ${name}`, `Are you sure?`, async () => {
         const { error } = await _supabase.from('projects').delete().eq('id', projectId);
         if (error) showToast('Error: ' + error.message, 'error');
         else { showToast('Project deleted.', 'success'); renderProjectsList(); }
     });
 }
 
-// --- EMPLOYEE MANAGEMENT ---
 async function renderEmployeeList() {
     const panel = document.getElementById('manageEmployeesPanel');
     panel.innerHTML = '<h2>Manage Employees</h2><p>Loading...</p>';
     await fetchAllProjects();
     const { data: employees, error } = await _supabase.from('employees').select('*, project:projects(name)').eq('client_id', numericClientId).order('employee_id');
-    if (error) { panel.innerHTML += `<p style="color:red">$-{error.message}</p>`; return; }
+    if (error) { panel.innerHTML += `<p style="color:red">${error.message}</p>`; return; }
 
-    let projectOptions = allProjects.map(p => `<option value="$-{p.id}">$-{p.name}</option>`).join('');
+    let projectOptions = allProjects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
     
     panel.innerHTML = `
         <h2>Manage Employees</h2>
@@ -238,18 +232,20 @@ async function renderEmployeeList() {
         <div id="employeeFormContainer" class="form-container"></div>
         <h3>Existing Employees</h3>
         <table>
-            <tr><th>ID</th><th>Name</th><th>Project</th><th>Status</th><th>Actions</th></tr>
-            $-{employees.map(emp => `
+            <thead><tr><th>ID</th><th>Name</th><th>Project</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+            ${employees.map(emp => `
                 <tr>
-                    <td>$-{emp.employee_id}</td>
-                    <td>$-{emp.name}</td>
-                    <td>$-{emp.project ? emp.project.name : 'None'}</td>
-                    <td>$-{emp.active ? 'Active' : 'Inactive'}</td>
+                    <td>${emp.employee_id}</td>
+                    <td>${emp.name}</td>
+                    <td>${emp.project ? emp.project.name : 'None'}</td>
+                    <td>${emp.active ? 'Active' : 'Inactive'}</td>
                     <td>
-                        <button onclick="openEmployeeForm('$-{emp.id}')" class="secondary">Edit</button>
-                        <button onclick="deleteEmployee('$-{emp.id}', '$-{emp.name}')" class="warning">Delete</button>
+                        <button onclick="openEmployeeForm('${emp.id}')" class="secondary">Edit</button>
+                        <button onclick="deleteEmployee('${emp.id}', '${emp.name}')" class="warning">Delete</button>
                     </td>
                 </tr>`).join('')}
+            </tbody>
         </table>`;
     
     document.querySelector('#employeeFormContainer').innerHTML = `
@@ -259,8 +255,8 @@ async function renderEmployeeList() {
             <div>Employee ID: <input type="text" id="empId"></div>
             <div>Name: <input type="text" id="empName"></div>
             <div>Hourly Rate: <input type="number" id="empRate"></div>
-            <div>PIN (4-digits): <input type="password" id="empPin" placeholder="Required for new employee"></div>
-            <div>Project: <select id="empProject"><option value="">None</option>$-{projectOptions}</select></div>
+            <div>PIN (4-digits): <input type="password" id="empPin" placeholder="Required for new employee" maxlength="4"></div>
+            <div>Project: <select id="empProject"><option value="">None</option>${projectOptions}</select></div>
             <div><label><input type="checkbox" id="empActive" checked> Active</label></div>
         </div>
         <button id="saveEmpButton" onclick="saveEmployee()">Save</button>
@@ -270,13 +266,13 @@ async function renderEmployeeList() {
 
 async function openEmployeeForm(dbId = null) {
     const form = document.getElementById('employeeFormContainer');
+    document.getElementById('empPin').value = '';
     if (!dbId) {
         document.getElementById('employeeFormTitle').textContent = 'Add New Employee';
         document.getElementById('empDbId').value = '';
         document.getElementById('empId').value = '';
         document.getElementById('empName').value = '';
         document.getElementById('empRate').value = '';
-        document.getElementById('empPin').value = '';
         document.getElementById('empPin').placeholder = 'Required';
         document.getElementById('empProject').value = '';
         document.getElementById('empActive').checked = true;
@@ -319,7 +315,7 @@ async function saveEmployee() {
     }
 
     if (response.error) {
-        showToast(\`Error: $-{response.error.message}\`, 'error');
+        showToast(`Error: ${response.error.message}`, 'error');
     } else {
         showToast(dbId ? 'Employee updated!' : 'Employee created!', 'success');
         document.getElementById('employeeFormContainer').style.display = 'none';
@@ -328,47 +324,50 @@ async function saveEmployee() {
 }
 
 async function deleteEmployee(dbId, name) {
-    showConfirmModal(\`Delete $-{name}\`, \`Are you sure?\`, async () => {
+    showConfirmModal(`Delete ${name}`, `Are you sure?`, async () => {
         const { error } = await _supabase.from('employees').delete().eq('id', dbId);
         if (error) showToast('Error: ' + error.message, 'error');
         else { showToast('Employee deleted.', 'success'); renderEmployeeList(); }
     });
 }
 
-// --- TIME ENTRY MANAGEMENT ---
 async function renderTimeEntries() {
     const panel = document.getElementById('timeEntriesPanel');
     panel.innerHTML = '<h2>Recent Time Entries</h2><p>Loading...</p>';
     const { data, error } = await _supabase.from('time_entries').select('*, employee:employees(name)').eq('client_id', numericClientId).order('clock_in', { ascending: false }).limit(100);
-    if(error) { panel.innerHTML += `<p style="color:red">$-{error.message}</p>`; return; }
+    if(error) { panel.innerHTML += `<p style="color:red">${error.message}</p>`; return; }
     
     panel.innerHTML = `
         <h2>Recent Time Entries</h2>
         <button onclick="goBack()" class="secondary">Back</button>
         <table>
-            <tr><th>Employee</th><th>Clock In</th><th>Clock Out</th><th>Actions</th></tr>
-            $-{data.map(entry => `
+            <thead><tr><th>Employee</th><th>Clock In</th><th>Clock Out</th><th>Actions</th></tr></thead>
+            <tbody>
+            ${data.map(entry => `
                 <tr>
-                    <td>$-{entry.employee ? entry.employee.name : 'N/A'}</td>
-                    <td>$-{new Date(entry.clock_in).toLocaleString()}</td>
-                    <td>$-{entry.clock_out ? new Date(entry.clock_out).toLocaleString() : '<b>Still Clocked In</b>'}</td>
+                    <td>${entry.employee ? entry.employee.name : 'N/A'}</td>
+                    <td>${new Date(entry.clock_in).toLocaleString()}</td>
+                    <td>${entry.clock_out ? new Date(entry.clock_out).toLocaleString() : '<b>Still Clocked In</b>'}</td>
                     <td>
-                        $-{!entry.clock_out ? `<button onclick="closeEntry('$-{entry.id}')" class="warning">Force Clock-Out</button>` : ''}
-                        <button onclick="openEditEntryModal('$-{entry.id}', '$-{entry.clock_in}', '$-{entry.clock_out}')" class="secondary">Edit</button>
+                        ${!entry.clock_out ? `<button onclick="closeEntry('${entry.id}')" class="warning">Force Clock-Out</button>` : ''}
+                        <button onclick="openEditEntryModal('${entry.id}', '${entry.clock_in}', '${entry.clock_out}')" class="secondary">Edit</button>
                     </td>
                 </tr>`).join('')}
+            </tbody>
         </table>`;
 }
 
 function toLocalISOString(date) {
+    if (!date) return '';
+    const d = new Date(date);
     const pad = (num) => num.toString().padStart(2, '0');
-    return date ? \`$-{date.getFullYear()}-$-{pad(date.getMonth() + 1)}-$-{pad(date.getDate())}T$-{pad(date.getHours())}:$-{pad(date.getMinutes())}\` : '';
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function openEditEntryModal(entryId, clockIn, clockOut) {
     document.getElementById('editEntryId').value = entryId;
-    document.getElementById('editClockIn').value = toLocalISOString(new Date(clockIn));
-    document.getElementById('editClockOut').value = clockOut ? toLocalISOString(new Date(clockOut)) : '';
+    document.getElementById('editClockIn').value = toLocalISOString(clockIn);
+    document.getElementById('editClockOut').value = toLocalISOString(clockOut);
     document.getElementById('edit-entry-modal-overlay').style.display = 'flex';
 }
 
@@ -377,8 +376,7 @@ async function saveTimeEntry() {
     const clockIn = document.getElementById('editClockIn').value;
     let clockOut = document.getElementById('editClockOut').value;
 
-    const updateData = { clock_in: clockIn };
-    if (clockOut) updateData.clock_out = clockOut;
+    const updateData = { clock_in: clockIn, clock_out: clockOut || null };
 
     const { error } = await _supabase.from('time_entries').update(updateData).eq('id', entryId);
     if (error) {
@@ -389,13 +387,13 @@ async function saveTimeEntry() {
         renderTimeEntries();
     }
 }
+
 async function closeEntry(entryId) {
     const { error } = await _supabase.from('time_entries').update({ clock_out: new Date().toISOString() }).eq('id', entryId);
     if (error) showToast('Error: ' + error.message, 'error');
     else { showToast('Entry closed.', 'success'); renderTimeEntries(); }
 }
 
-// --- REPORTS ---
 function renderReportsPanel() {
     const panel = document.getElementById('reportsPanel');
     panel.innerHTML = `
@@ -436,10 +434,10 @@ async function generateReport() {
         const clockIn = new Date(entry.clock_in);
         const clockOut = new Date(entry.clock_out);
         const duration = (clockOut - clockIn) / (1000 * 60 * 60); // hours
-        const rate = entry.employee.hourly_rate || 0;
+        const rate = entry.employee ? (entry.employee.hourly_rate || 0) : 0;
         const total = (duration * rate).toFixed(2);
         return {
-            employee: entry.employee.name,
+            employee: entry.employee ? entry.employee.name : 'N/A',
             project: entry.project ? entry.project.name : 'N/A',
             clock_in: clockIn.toLocaleString(),
             clock_out: clockOut.toLocaleString(),
@@ -453,7 +451,10 @@ async function generateReport() {
 
 function exportToCSV(data) {
     const header = Object.keys(data[0]);
-    const csv = [header.join(','), ...data.map(row => header.map(field => `"$-{String(row[field]).replace(/"/g, '""')}"`).join(','))].join('\r\n');
+    const csv = [
+        header.join(','),
+        ...data.map(row => header.map(field => `"${String(row[field]).replace(/"/g, '""')}"`).join(','))
+    ].join('\r\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -464,7 +465,6 @@ function exportToCSV(data) {
     link.click();
     document.body.removeChild(link);
 }
-
 </script>
 </body>
 </html>
