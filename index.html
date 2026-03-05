@@ -139,7 +139,7 @@ async function validateAdmin() {
   const pin = document.getElementById("adminPinInput").value.trim();
   if (!pin) return;
 
-  // Step 1: Get admin user data using PIN
+  // Step 1: Get admin user data using PIN (This works)
   const { data: adminUser, error: adminError } = await _supabase
     .from("admins")
     .select("id, name")
@@ -152,28 +152,21 @@ async function validateAdmin() {
     return;
   }
 
-  // Step 2: Use the admin's ID to find their associated client
-  const { data: client, error: clientError } = await _supabase
+  // Diagnostic Step: Fetch and show the structure of the first client
+  const { data: clientData, error: clientError } = await _supabase
     .from("clients")
-    .select("id") 
-    .eq("owner_id", adminUser.id) // FINAL ATTEMPT: Using owner_id based on admin's "owner" role
+    .select("*")
+    .limit(1)
     .single();
 
-  if (clientError || !client) {
-    alert("This admin account is not linked to a client company. Please check the database configuration.");
-    document.getElementById("adminPinInput").value = "";
-    return;
+  if (clientError || !clientData) {
+      alert("Could not fetch any data from the 'clients' table. Error: " + (clientError ? clientError.message : "No clients found."));
+      return;
   }
   
-  // Step 3: Success! Prepare data and redirect
-  const adminData = {
-      name: adminUser.name,
-      client_id: client.id
-  };
-  
-  sessionStorage.setItem('adminAuthenticated', 'true');
-  sessionStorage.setItem('adminData', JSON.stringify(adminData));
-  window.location.href = 'admin.html';
+  // Show the structure and stop
+  alert(`Client table structure received: ${JSON.stringify(clientData)}`);
+  document.getElementById("adminPinInput").value = "";
 }
 
 </script>
