@@ -101,9 +101,9 @@
     #clockContainer { margin-bottom: 2.5rem; }
     #date { font-size: 1.1rem; color: #7f8c8d; margin-bottom: 0.5rem; font-weight: 500; }
     #clock { font-size: 3.5rem; font-weight: 700; color: #2cb3ba; font-variant-numeric: tabular-nums; }
-    .input-group { margin-bottom: 2rem; }
+    .input-group { margin-bottom: 1.5rem; }
     label { display: block; font-size: 0.9rem; font-weight: 600; color: #7f8c8d; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.8rem; }
-    input#empId { width: 100%; padding: 1rem; font-size: 1.5rem; border: 2px solid #dcdde1; border-radius: 16px; text-align: center; box-sizing: border-box; }
+    input#empId, input#empPin { width: 100%; padding: 1rem; font-size: 1.5rem; border: 2px solid #dcdde1; border-radius: 16px; text-align: center; box-sizing: border-box; }
     .button-group { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
     button { padding: 1.2rem; font-size: 1.1rem; font-weight: 600; border: none; border-radius: 14px; cursor: pointer; }
     button[onclick="clockIn()"] { background-color: #eb8e55; color: white; }
@@ -113,7 +113,7 @@
     .modal-content { background: white; padding: 20px; border-radius: 8px; text-align: center; }
     .hidden { display: none !important; }
     input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-    input[type=number] { -moz-appearance: textfield; }
+    input[type=number], input[type=password] { -moz-appearance: textfield; }
   </style>
 </head>
 <body>
@@ -126,6 +126,10 @@
   <div class="input-group">
     <label>Employee ID</label>
     <input id="empId" type="number" placeholder="0000" oninput="if(this.value.length > 4) this.value = this.value.slice(0,4);">
+  </div>
+  <div class="input-group">
+    <label>PIN</label>
+    <input id="empPin" type="password" placeholder="••••" maxlength="4" inputmode="numeric" pattern="[0-9]*">
   </div>
   <div class="button-group">
     <button onclick="clockIn()">Clock In</button>
@@ -168,6 +172,7 @@ function updateClock() {
 
 function resetUI() {
     document.getElementById("empId").value = "";
+    document.getElementById("empPin").value = "";
     document.getElementById("msg").innerText = "";
 }
 
