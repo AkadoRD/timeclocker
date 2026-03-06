@@ -11,9 +11,61 @@
   <script>
     function isOnline() { return navigator.onLine; }
     if ("serviceWorker" in navigator) { window.addEventListener("load", () => { navigator.serviceWorker.register("./sw.js"); }); }
-    function saveOfflineEntry(entry) { let p = JSON.parse(localStorage.getItem("pendingEntries"))||[]; p.push(entry); localStorage.setItem("pendingEntries",JSON.stringify(p)); }
-    async function syncOfflineEntries() { if(typeof _supabase === "undefined" || !isOnline()) return; let p = JSON.parse(localStorage.getItem("pendingEntries"))||[]; if(p.length===0)return; const{error}=await _supabase.from("time_entries").insert(p); if(!error)localStorage.removeItem("pendingEntries"); }
-    window.addEventListener("online", syncOfflineEntries);
+    
+    function saveOfflineAction(action) { 
+      let p = JSON.parse(localStorage.getItem("pendingActions")) || [];
+      p.push(action);
+      localStorage.setItem("pendingActions", JSON.stringify(p));
+    }
+
+    async function syncOfflineActions() {
+      if(typeof _supabase === "undefined" || !isOnline()) return;
+      let pendingActions = JSON.parse(localStorage.getItem("pendingActions")) || [];
+      if (pendingActions.length === 0) return;
+
+      console.log(`Syncing ${pendingActions.length} pending actions...`);
+      const remainingActions = [];
+      
+      for (const action of pendingActions) {
+        let success = false;
+        try {
+          if (action.type === 'clock_in') {
+            const { data: employee } = await _supabase.from("employees").select("current_project_id, client_id").eq("employee_id", action.employee_id).eq("active", true).single();
+            if (employee) {
+              const { error } = await _supabase.from("time_entries").insert([{ 
+                employee_id: action.employee_id, 
+                clock_in: action.timestamp, 
+                project_id: employee.current_project_id, 
+                client_id: employee.client_id 
+              }]);
+              if (!error) success = true;
+              else console.error('Sync clock-in error:', error.message);
+            }
+          } else if (action.type === 'clock_out') {
+            const { data: openEntry } = await _supabase.from("time_entries").select("id").eq("employee_id", action.employee_id).is("clock_out", null).maybeSingle();
+            if (openEntry) {
+              const { error } = await _supabase.from("time_entries").update({ clock_out: action.timestamp }).eq("id", openEntry.id);
+              if (!error) success = true;
+              else console.error('Sync clock-out error:', error.message);
+            } else {
+              // No open entry found, this action might be stale or invalid. We discard it.
+              success = true; 
+            }
+          }
+        } catch (e) {
+          console.error('Exception during sync:', e.message);
+        }
+
+        if (!success) {
+          remainingActions.push(action);
+        }
+      }
+      localStorage.setItem("pendingActions", JSON.stringify(remainingActions));
+      if(remainingActions.length === 0) console.log('All pending actions synced successfully!');
+      else console.log(`${remainingActions.length} actions failed to sync, will retry later.`);
+    }
+
+    window.addEventListener("online", syncOfflineActions);
   </script>
   <style>
     body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f8f9fa; display: flex; align-items: center; justify-content: center; min-height: 100vh; user-select: none; touch-action: manipulation; }
@@ -69,7 +121,7 @@ const _supabase = supabase.createClient("https://jqppakaodpgbtxzpvsti.supabase.c
 document.addEventListener('DOMContentLoaded', () => {
     updateClock();
     setInterval(updateClock, 1000);
-    syncOfflineEntries();
+    syncOfflineActions(); // Attempt to sync on page load
     const clockElement = document.getElementById("clock");
     let pressTimer = null;
     const startPress = () => { pressTimer = setTimeout(openAdmin, 3000); };
@@ -97,17 +149,19 @@ async function clockIn() {
     if (!empId) { alert("Please enter an Employee ID."); return; }
     const msg = document.getElementById("msg");
     msg.innerText = "Processing...";
+    const now = new Date().toISOString();
+
     if (isOnline()) {
         const { data: openEntry } = await _supabase.from("time_entries").select("id").eq("employee_id", empId).is("clock_out", null).maybeSingle();
         if (openEntry) { msg.innerText = "You are already clocked in."; return; }
         const { data: employee } = await _supabase.from("employees").select("current_project_id, client_id").eq("employee_id", empId).eq("active", true).single();
         if (!employee) { msg.innerText = "Employee not found or inactive."; return; }
-        const { error } = await _supabase.from("time_entries").insert([{ employee_id: empId, clock_in: new Date().toISOString(), project_id: employee.current_project_id, client_id: employee.client_id }]);
+        const { error } = await _supabase.from("time_entries").insert([{ employee_id: empId, clock_in: now, project_id: employee.current_project_id, client_id: employee.client_id }]);
         if (error) { msg.innerText = `Error: ${error.message}`; } 
         else { msg.innerText = "Checked In!"; setTimeout(resetUI, 2000); }
     } else {
-        saveOfflineEntry({ employee_id: empId, clock_in: new Date().toISOString(), project_id: null, client_id: null }); // client_id will be null offline
-        msg.innerText = "Saved offline (no project assigned).";
+        saveOfflineAction({ type: 'clock_in', employee_id: empId, timestamp: now });
+        msg.innerText = "Saved offline. Will sync when online.";
         setTimeout(resetUI, 2000);
     }
 }
@@ -115,14 +169,21 @@ async function clockIn() {
 async function clockOut() {
     const empId = document.getElementById("empId").value.trim();
     if (!empId) { alert("Please enter an Employee ID."); return; }
-    if (!isOnline()) { alert("Clock-out requires an internet connection."); return; }
     const msg = document.getElementById("msg");
     msg.innerText = "Processing...";
-    const { data: openEntry } = await _supabase.from("time_entries").select("id").eq("employee_id", empId).is("clock_out", null).maybeSingle();
-    if (!openEntry) { msg.innerText = "No active clock-in found."; return; }
-    const { error } = await _supabase.from("time_entries").update({ clock_out: new Date().toISOString() }).eq("id", openEntry.id);
-    if (error) { msg.innerText = `Error: ${error.message}`; } 
-    else { msg.innerText = "Clocked Out!"; setTimeout(resetUI, 2000); }
+    const now = new Date().toISOString();
+
+    if (isOnline()) {
+      const { data: openEntry } = await _supabase.from("time_entries").select("id").eq("employee_id", empId).is("clock_out", null).maybeSingle();
+      if (!openEntry) { msg.innerText = "No active clock-in found."; return; }
+      const { error } = await _supabase.from("time_entries").update({ clock_out: now }).eq("id", openEntry.id);
+      if (error) { msg.innerText = `Error: ${error.message}`; } 
+      else { msg.innerText = "Clocked Out!"; setTimeout(resetUI, 2000); }
+    } else {
+        saveOfflineAction({ type: 'clock_out', employee_id: empId, timestamp: now });
+        msg.innerText = "Clock-out saved offline. Will sync when online.";
+        setTimeout(resetUI, 2000);
+    }
 }
 
 function openAdmin() {
