@@ -504,6 +504,12 @@ function renderReportsPanel() {
     `;
 }
 
+function toYYYYMMDDHHMMSS(date) {
+    const d = new Date(date);
+    const pad = (num) => num.toString().padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 async function generateReport() {
     const startDate = document.getElementById('reportStartDate').value;
     const endDate = document.getElementById('reportEndDate').value;
@@ -514,7 +520,7 @@ async function generateReport() {
 
     const { data, error } = await _supabase
         .from('time_entries')
-        .select('*, employee:employees(name, hourly_rate), project:projects(name)')
+        .select('*, employee:employees!left(employee_id, name, hourly_rate), project:projects!left(id, name)')
         .eq('client_id', numericClientId)
         .gte('clock_in', start)
         .lte('clock_in', end.toISOString())
@@ -531,10 +537,12 @@ async function generateReport() {
         const rate = entry.employee ? (entry.employee.hourly_rate || 0) : 0;
         const total = (duration * rate).toFixed(2);
         return {
-            employee: entry.employee ? entry.employee.name : 'N/A',
-            project: entry.project ? entry.project.name : 'N/A',
-            clock_in: clockIn.toLocaleString(),
-            clock_out: clockOut.toLocaleString(),
+            employee_id: entry.employee ? entry.employee.employee_id : 'N/A',
+            employee_name: entry.employee ? entry.employee.name : 'Deleted Employee',
+            project_id: entry.project ? entry.project.id : 'N/A',
+            project_name: entry.project ? entry.project.name : 'No Project',
+            clock_in: toYYYYMMDDHHMMSS(clockIn),
+            clock_out: toYYYYMMDDHHMMSS(clockOut),
             duration_hours: duration.toFixed(3),
             hourly_rate: rate,
             total_pay: total
@@ -544,10 +552,11 @@ async function generateReport() {
 }
 
 function exportToCSV(data) {
+    if (data.length === 0) return;
     const header = Object.keys(data[0]);
     const csv = [
         header.join(','),
-        ...data.map(row => header.map(field => `"${String(row[field]).replace(/"/g, '""')}"`).join(','))
+        ...data.map(row => header.map(field => `"${String(row[field]).replace(/"/g, ''''''')}"`).join(','))
     ].join('\r\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
