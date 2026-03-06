@@ -36,7 +36,9 @@
                 employee_id: action.employee_id, 
                 clock_in: action.timestamp, 
                 project_id: employee.current_project_id, 
-                client_id: employee.client_id 
+                client_id: employee.client_id,
+                clock_in_lat: action.lat,
+                clock_in_lon: action.lon
               }]);
               if (!error) success = true;
               else console.error('Sync clock-in error:', error.message);
@@ -44,11 +46,14 @@
           } else if (action.type === 'clock_out') {
             const { data: openEntry } = await _supabase.from("time_entries").select("id").eq("employee_id", action.employee_id).is("clock_out", null).maybeSingle();
             if (openEntry) {
-              const { error } = await _supabase.from("time_entries").update({ clock_out: action.timestamp }).eq("id", openEntry.id);
+              const { error } = await _supabase.from("time_entries").update({ 
+                clock_out: action.timestamp,
+                clock_out_lat: action.lat,
+                clock_out_lon: action.lon
+              }).eq("id", openEntry.id);
               if (!error) success = true;
               else console.error('Sync clock-out error:', error.message);
             } else {
-              // No open entry found, this action might be stale or invalid. We discard it.
               success = true; 
             }
           }
@@ -66,6 +71,29 @@
     }
 
     window.addEventListener("online", syncOfflineActions);
+
+    function getGeolocation() {
+      return new Promise((resolve) => {
+        if (!navigator.geolocation) {
+          console.log("Geolocation is not supported by this browser.");
+          resolve({ lat: null, lon: null });
+        } else {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              resolve({
+                lat: position.coords.latitude,
+                lon: position.coords.longitude,
+              });
+            },
+            () => {
+              console.log("Unable to retrieve your location.");
+              alert("Unable to get location. Please enable location services and grant permission.");
+              resolve({ lat: null, lon: null });
+            }
+          );
+        }
+      });
+    }
   </script>
   <style>
     body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f8f9fa; display: flex; align-items: center; justify-content: center; min-height: 100vh; user-select: none; touch-action: manipulation; }
@@ -148,19 +176,35 @@ async function clockIn() {
     if (empId === "9999") { openAdmin(); return; }
     if (!empId) { alert("Please enter an Employee ID."); return; }
     const msg = document.getElementById("msg");
-    msg.innerText = "Processing...";
+    msg.innerText = "Getting location...";
     const now = new Date().toISOString();
+    
+    const location = await getGeolocation();
+    msg.innerText = "Processing...";
 
     if (isOnline()) {
         const { data: openEntry } = await _supabase.from("time_entries").select("id").eq("employee_id", empId).is("clock_out", null).maybeSingle();
         if (openEntry) { msg.innerText = "You are already clocked in."; return; }
         const { data: employee } = await _supabase.from("employees").select("current_project_id, client_id").eq("employee_id", empId).eq("active", true).single();
         if (!employee) { msg.innerText = "Employee not found or inactive."; return; }
-        const { error } = await _supabase.from("time_entries").insert([{ employee_id: empId, clock_in: now, project_id: employee.current_project_id, client_id: employee.client_id }]);
+        const { error } = await _supabase.from("time_entries").insert([{ 
+            employee_id: empId, 
+            clock_in: now, 
+            project_id: employee.current_project_id, 
+            client_id: employee.client_id,
+            clock_in_lat: location.lat,
+            clock_in_lon: location.lon
+        }]);
         if (error) { msg.innerText = `Error: ${error.message}`; } 
         else { msg.innerText = "Checked In!"; setTimeout(resetUI, 2000); }
     } else {
-        saveOfflineAction({ type: 'clock_in', employee_id: empId, timestamp: now });
+        saveOfflineAction({ 
+            type: 'clock_in', 
+            employee_id: empId, 
+            timestamp: now,
+            lat: location.lat,
+            lon: location.lon
+        });
         msg.innerText = "Saved offline. Will sync when online.";
         setTimeout(resetUI, 2000);
     }
@@ -170,17 +214,30 @@ async function clockOut() {
     const empId = document.getElementById("empId").value.trim();
     if (!empId) { alert("Please enter an Employee ID."); return; }
     const msg = document.getElementById("msg");
-    msg.innerText = "Processing...";
+    msg.innerText = "Getting location...";
     const now = new Date().toISOString();
+
+    const location = await getGeolocation();
+    msg.innerText = "Processing...";
 
     if (isOnline()) {
       const { data: openEntry } = await _supabase.from("time_entries").select("id").eq("employee_id", empId).is("clock_out", null).maybeSingle();
       if (!openEntry) { msg.innerText = "No active clock-in found."; return; }
-      const { error } = await _supabase.from("time_entries").update({ clock_out: now }).eq("id", openEntry.id);
+      const { error } = await _supabase.from("time_entries").update({ 
+          clock_out: now,
+          clock_out_lat: location.lat,
+          clock_out_lon: location.lon
+      }).eq("id", openEntry.id);
       if (error) { msg.innerText = `Error: ${error.message}`; } 
       else { msg.innerText = "Clocked Out!"; setTimeout(resetUI, 2000); }
     } else {
-        saveOfflineAction({ type: 'clock_out', employee_id: empId, timestamp: now });
+        saveOfflineAction({ 
+            type: 'clock_out', 
+            employee_id: empId, 
+            timestamp: now,
+            lat: location.lat,
+            lon: location.lon
+        });
         msg.innerText = "Clock-out saved offline. Will sync when online.";
         setTimeout(resetUI, 2000);
     }
@@ -228,7 +285,7 @@ async function validateAdmin() {
         const { data: newClient, error: newClientError } = await _supabase
             .from('clients')
             .insert({ 
-                name: `${adminUser.name}'s Company`, 
+                name: `${adminUser.name}\'s Company`, 
                 admin_id: adminUser.id
             })
             .select('id')
