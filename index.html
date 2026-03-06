@@ -109,9 +109,7 @@
     button[onclick="clockIn()"] { background-color: #eb8e55; color: white; }
     button[onclick="clockOut()"] { background-color: #2cb3ba; color: white; }
     #msg { margin-top: 2rem; padding: 1rem; font-size: 1rem; min-height: 20px; border-radius: 12px; font-weight: 500; }
-    .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 10000; }
-    .modal-content { background: white; padding: 20px; border-radius: 8px; text-align: center; }
-    .hidden { display: none !important; }
+    /* Removed modal styles as modal is removed */
     input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     input[type=number], input[type=password] { -moz-appearance: textfield; }
   </style>
@@ -138,14 +136,7 @@
   <p id="msg"></p>
 </div>
 
-<div id="adminModal" class="modal hidden">
-  <div class="modal-content">
-    <h3>Enter Admin PIN</h3>
-    <input type="password" id="adminPinInput" placeholder="PIN" maxlength="4" inputmode="numeric" pattern="[0-9]*" />
-    <button onclick="validateAdmin()">Enter</button>
-    <button onclick="closeAdminModal()">Cancel</button>
-  </div>
-</div>
+<!-- Removed the adminModal div -->
 
 <script>
 const _supabase = supabase.createClient("https://jqppakaodpgbtxzpvsti.supabase.co", "sb_publishable_ZwLCHMtM9uCfBFkwBcSSEQ_zQVq1RwI");
@@ -178,6 +169,7 @@ function resetUI() {
 
 async function clockIn() {
     const empId = document.getElementById("empId").value.trim();
+    // The "9999" check for admin is no longer the primary method, but we can keep it.
     if (empId === "9999") { openAdmin(); return; }
     if (!empId) { alert("Please enter an Employee ID."); return; }
     const msg = document.getElementById("msg");
@@ -248,73 +240,57 @@ async function clockOut() {
     }
 }
 
-function openAdmin() {
-  document.getElementById("adminModal").classList.remove("hidden");
-  document.getElementById("adminPinInput").focus();
-}
+async function openAdmin() {
+  const employeeId = prompt("Por favor, introduce tu ID de empleado para acceder al panel de administrador:");
+  if (!employeeId) return;
 
-function closeAdminModal() {
-  document.getElementById("adminModal").classList.add("hidden");
-  document.getElementById("adminPinInput").value = "";
-}
+  const pin = prompt("Por favor, introduce tu PIN:");
+  if (!pin) return;
 
-async function validateAdmin() {
-    const pin = document.getElementById("adminPinInput").value.trim();
-    if (!pin) return;
+  // Show loading indicator
+  document.body.style.cursor = 'wait';
+  const clockInButton = document.querySelector('button[onclick="clockIn()"]');
+  if(clockInButton) clockInButton.disabled = true;
 
-    const { data: adminUser, error: adminError } = await _supabase
-        .from("admins")
-        .select("id, name, role")
-        .eq("pin", pin)
+  try {
+    // Step 1: Validate PIN using the Edge Function
+    const { data: validationData, error: validationError } = await _supabase.functions.invoke('validate-pin', {
+        body: { employeeId, pin }
+    });
+
+    if (validationError) throw validationError;
+
+    if (validationData.valid) {
+      // Step 2: If valid, fetch employee data for the session
+      const { data: employeeData, error: employeeError } = await _supabase
+        .from('employees')
+        .select('name, client_id')
+        .eq('employee_id', employeeId)
         .single();
 
-    if (adminError || !adminUser) {
-        alert("Incorrect PIN or admin account issue.");
-        return;
+      if (employeeError) throw employeeError;
+
+      // Step 3: Store data in session and redirect
+      const adminData = {
+          name: employeeData.name,
+          client_id: employeeData.client_id
+      };
+      sessionStorage.setItem('adminData', JSON.stringify(adminData));
+      window.location.href = 'admin.html';
+
+    } else {
+      // Use the error message from the function if it exists, otherwise use a generic one
+      const message = validationData.error || 'ID de empleado o PIN incorrecto. El empleado también debe estar activo.';
+      alert(message);
     }
-
-    let { data: client, error: clientError } = await _supabase
-        .from("clients")
-        .select("id")
-        .eq("admin_id", adminUser.id)
-        .maybeSingle();
-
-    if (clientError) {
-        alert(`Database error: Could not check for client. Have you added the 'admin_id' column to the 'clients' table? Error: ${clientError.message}`);
-        return;
-    }
-
-    let finalClientId = client ? client.id : null;
-
-    if (adminUser.role === 'owner' && !finalClientId) {
-        const { data: newClient, error: newClientError } = await _supabase
-            .from('clients')
-            .insert({ 
-                name: `${adminUser.name}\'s Company`, 
-                admin_id: adminUser.id
-            })
-            .select('id')
-            .single();
-        
-        if (newClientError) {
-            alert(`Failed to create and link new client company. Error: ${newClientError.message}`);
-            return;
-        }
-        finalClientId = newClient.id;
-    }
-
-    if (!finalClientId) {
-        alert("This admin account is not linked to a client company.");
-        return;
-    }
-
-    const adminData = {
-        name: adminUser.name,
-        client_id: finalClientId
-    };
-    
-    sessionStorage.setItem('adminData', JSON.stringify(adminData));
-    window.location.href = 'admin.html';
+  } catch (error) {
+    console.error('Error durante el acceso de administrador:', error.message);
+    alert('Error de validación: ' + error.message);
+  } finally {
+    // Restore UI
+    document.body.style.cursor = 'default';
+     if(clockInButton) clockInButton.disabled = false;
+  }
 }
 
 </script>
