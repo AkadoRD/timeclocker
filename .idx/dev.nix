@@ -6,6 +6,7 @@
 
   # Use https://search.nixos.org/packages to find packages
   packages = [
+    pkgs.docker
     # pkgs.go
     # pkgs.python311
     # pkgs.python311Packages.pip
@@ -52,4 +53,6 @@
       };
     };
   };
+  # Enable the docker daemon
+  services.docker.enable = true;
 }

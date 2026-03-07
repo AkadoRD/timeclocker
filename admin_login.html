@@ -1,0 +1,67 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; background-color: #f8f9fa; }
+        #login-card { background: white; padding: 3rem; border-radius: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.05); text-align: center; width: 90%; max-width: 400px; }
+        h2 { color: #2f3640; margin-bottom: 2rem; }
+        input { width: 100%; padding: 1rem; margin-bottom: 1.5rem; border: 2px solid #dcdde1; border-radius: 12px; font-size: 1rem; box-sizing: border-box; }
+        button { width: 100%; padding: 1.2rem; background-color: #2cb3ba; color: white; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }
+        button:hover { background-color: #259399; }
+        #error-message { color: #c0392b; margin-top: 1.5rem; font-weight: 500; min-height: 20px; }
+    </style>
+</head>
+<body>
+    <div id="login-card">
+        <h2>Admin Login</h2>
+        <input type="email" id="email" placeholder="Email">
+        <input type="password" id="password" placeholder="Password">
+        <button id="login-button">Login</button>
+        <p id="error-message"></p>
+    </div>
+    <script>
+        let _supabase;
+
+        async function initializeSupabase() {
+            try {
+                const response = await fetch('./supabase/functions/get-config');
+                if (!response.ok) throw new Error(`Failed to fetch config: ${response.statusText}`);
+                const config = await response.json();
+                if (!config.supabaseUrl || !config.supabaseAnonKey) throw new Error('Supabase URL or Anon Key is missing.');
+                _supabase = supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+            } catch (error) {
+                console.error('Initialization error:', error);
+                document.getElementById('error-message').textContent = "Error: Could not connect to the server.";
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeSupabase();
+
+            document.getElementById('login-button').addEventListener('click', async () => {
+                if (!_supabase) { 
+                    document.getElementById('error-message').textContent = "Connecting to server... please wait.";
+                    return; 
+                }
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                const { data, error } = await _supabase.auth.signInWithPassword({
+                    email,
+                    password,
+                });
+
+                if (error) {
+                    document.getElementById('error-message').textContent = error.message;
+                } else {
+                    window.location.href = 'admin.html';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
