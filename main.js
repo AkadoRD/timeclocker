@@ -227,7 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     return { success: false, error: 'No active clock-in' };
                 }
                 
-                const { error } = await _supabase.from("time_entries").update({ clock_out: now, location_out: location ? JSON.stringify(location) : null }).eq("id", openEntry.id);
+                const { error } = await _supabase.from("time_entries").update({ clock_out: now, location: location ? JSON.stringify(location) : null }).eq("id", openEntry.id);
                 if (error) throw error;
                 if (!isSyncing) showToast("Clocked Out!", 'success');
             }
