@@ -1,285 +1,47 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <title>Employee Clock</title>
+  <meta name="google-site-verification" content="nyT60jJBASK4X9aWL9A6S_XlXUZSXr9T2JKSoYKULLI" />
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <!-- External Scripts and Styles -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <style>
-    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f8f9fa; display: flex; align-items: center; justify-content: center; min-height: 100vh; user-select: none; touch-action: manipulation; }
-    #mainCard { background: white; width: 90%; max-width: 450px; padding: 3rem 2rem; border-radius: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.05); text-align: center; }
-    #clockContainer { margin-bottom: 2.5rem; }
-    #date { font-size: 1.1rem; color: #7f8c8d; margin-bottom: 0.5rem; font-weight: 500; }
-    #clock { font-size: 3.5rem; font-weight: 700; color: #2cb3ba; font-variant-numeric: tabular-nums; }
-    .input-group { margin-bottom: 1.5rem; }
-    label { display: block; font-size: 0.9rem; font-weight: 600; color: #7f8c8d; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.8rem; }
-    input#empId { width: 100%; padding: 1rem; font-size: 1.5rem; border: 2px solid #dcdde1; border-radius: 16px; text-align: center; box-sizing: border-box; }
-    .button-group { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-    button { padding: 1.2rem; font-size: 1.1rem; font-weight: 600; border: none; border-radius: 14px; cursor: pointer; transition: background-color 0.2s; }
-    button[onclick^="requestPin"] { background-color: #eb8e55; color: white; }
-    button[onclick^="requestPin"]:last-child { background-color: #2cb3ba; color: white; }
-    button.secondary { background-color: #7f8c8d; }
-    button:disabled { background-color: #bdc3c7; cursor: not-allowed; }
-    #msg { margin-top: 2rem; padding: 1rem; font-size: 1rem; min-height: 20px; border-radius: 12px; font-weight: 500; }
-    .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; z-index: 1000; }
-    .modal { background: white; padding: 2rem; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 90%; max-width: 320px; text-align: center; }
-    .modal h3 { margin-top: 0; color: #2f3640; }
-    .modal p { color: #7f8c8d; }
-    .modal input { width: 100%; padding: 1rem; font-size: 1.5rem; border: 2px solid #dcdde1; border-radius: 12px; text-align: center; box-sizing: border-box; margin: 1rem 0; }
-    .modal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.5rem; }
-    input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-    input[type=number], input[type=password] { -moz-appearance: textfield; }
-  </style>
+  <link rel="stylesheet" href="main.css">
+  <script src="main.js" defer></script>
 </head>
 <body>
 
-<div id="mainCard">
-  <div id="clockContainer">
-    <div id="date"></div>
-    <div id="clock"></div>
-  </div>
-  <div class="input-group">
-    <label>Employee ID</label>
-    <input id="empId" type="number" placeholder="0000" oninput="if(this.value.length > 4) this.value = this.value.slice(0,4);">
-  </div>
-  <div class="button-group">
-    <button onclick="requestPin('clock_in')">Clock In</button>
-    <button onclick="requestPin('clock_out')">Clock Out</button>
-  </div>
-  <p id="msg"></p>
-</div>
-
-<div id="pin-modal-overlay" class="modal-overlay">
-    <div class="modal">
-        <h3 id="pin-modal-title">Enter PIN</h3>
-        <p id="pin-modal-message">For Employee ID: <b id="pin-emp-id"></b></p>
-        <input id="pinInput" type="password" inputmode="numeric" maxlength="4" placeholder="****">
-        <div class="modal-actions">
-            <button id="pin-submit-button">Submit</button>
-            <button id="pin-cancel-button" class="secondary">Cancel</button>
-        </div>
+  <!-- Main Application Card -->
+  <div id="mainCard">
+    <div id="clockContainer">
+      <div id="date">Loading...</div>
+      <div id="clock">--:-- --</div>
     </div>
-</div>
+    <div class="input-group">
+      <label for="empId">Employee ID</label>
+      <input id="empId" type="number" placeholder="0000" oninput="if(this.value.length > 4) this.value = this.value.slice(0,4);">
+    </div>
+    <div class="button-group">
+      <button class="clock-in">Clock In</button>
+      <button class="clock-out">Clock Out</button>
+    </div>
+  </div>
 
-<script>
-  let _supabase;
-  let currentActionType = null;
-  let currentEmployeeId = null;
+  <!-- Modal for Employee Selection -->
+  <div id="selectionModal" class="modal">
+    <div class="modal-content">
+      <h3>Multiple Employees Found</h3>
+      <p>Please select your profile to continue.</p>
+      <div id="employee-selection-list" class="selection-list"></div>
+      <button class="secondary">Cancel</button>
+    </div>
+  </div>
 
-  async function initializeApp() {
-    try {
-      const response = await fetch('./supabase/functions/get-config');
-      if (!response.ok) throw new Error(`Failed to fetch config: ${response.statusText}`);
-      const config = await response.json();
-      if (!config.supabaseUrl || !config.supabaseAnonKey) throw new Error('Supabase URL or Anon Key is missing.');
-      _supabase = supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
-      syncOfflineActions();
-    } catch (error) {
-      console.error('Failed to initialize Supabase client:', error);
-      document.getElementById("msg").innerText = "Error: Could not connect to the server.";
-    }
-  }
+  <!-- Container for Toast Notifications -->
+  <div id="notification-container"></div>
 
-  initializeApp();
-
-  if ("serviceWorker" in navigator) { window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js")); }
-  window.addEventListener("online", syncOfflineActions);
-
-  document.addEventListener('DOMContentLoaded', () => {
-      updateClock();
-      setInterval(updateClock, 1000);
-      document.getElementById('pin-cancel-button').addEventListener('click', hidePinModal);
-      document.getElementById('pin-submit-button').addEventListener('click', handlePinSubmit);
-      document.getElementById('pinInput').addEventListener('keyup', (e) => { if(e.key === 'Enter') handlePinSubmit(); });
-
-      const clockElement = document.getElementById("clock");
-      let pressTimer = null;
-      const startPress = () => { pressTimer = setTimeout(openAdmin, 3000); };
-      const cancelPress = () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } };
-      clockElement.addEventListener("mousedown", startPress);
-      clockElement.addEventListener("mouseup", cancelPress);
-      clockElement.addEventListener("touchstart", startPress);
-      clockElement.addEventListener("touchend", cancelPress);
-  });
-
-  function setMainButtonsDisabled(disabled) {
-    document.querySelectorAll('.button-group button').forEach(btn => btn.disabled = disabled);
-  }
-
-  function updateClock() {
-    const now = new Date();
-    document.getElementById("clock").innerText = now.toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", hour12: true });
-    document.getElementById("date").innerText = now.toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "long", month: "long", day: "numeric" });
-  }
-
-  function resetUI() {
-      document.getElementById("empId").value = "";
-      document.getElementById("msg").innerText = "";
-      setMainButtonsDisabled(false);
-  }
-
-  function requestPin(actionType) {
-    const empId = document.getElementById("empId").value.trim();
-    if (!empId) { alert("Please enter an Employee ID."); return; }
-
-    setMainButtonsDisabled(true);
-    currentActionType = actionType;
-    currentEmployeeId = empId;
-    
-    document.getElementById('pin-emp-id').textContent = empId;
-    document.getElementById('pin-modal-title').textContent = actionType === 'clock_in' ? 'Clock In' : 'Clock Out';
-    document.getElementById('pin-modal-overlay').style.display = 'flex';
-    document.getElementById('pinInput').focus();
-  }
-
-  function hidePinModal() {
-    document.getElementById('pin-modal-overlay').style.display = 'none';
-    document.getElementById('pinInput').value = '';
-    currentActionType = null;
-    currentEmployeeId = null;
-    setMainButtonsDisabled(false);
-  }
-
-  async function handlePinSubmit() {
-    if (!_supabase) { alert("Application is not connected to server. Please wait."); return; }
-    
-    const pin = document.getElementById('pinInput').value;
-    if (pin.length !== 4) { alert("Please enter your 4-digit PIN."); return; }
-
-    hidePinModal();
-    const msg = document.getElementById("msg");
-    msg.innerText = "Verifying PIN...";
-
-    try {
-        const { data: validationData, error } = await _supabase.functions.invoke('validate-pin', {
-            body: { employeeId: currentEmployeeId, pin }
-        });
-
-        if (error) throw error;
-
-        if (validationData.valid) {
-            msg.innerText = "PIN verified. Processing action...";
-            await performClockAction(currentActionType, currentEmployeeId);
-        } else {
-            msg.innerText = validationData.error || "Invalid PIN or employee ID.";
-            setMainButtonsDisabled(false);
-        }
-    } catch (e) {
-        console.error('PIN validation error:', e.message);
-        msg.innerText = `Error: ${e.message}`;
-        setMainButtonsDisabled(false);
-    }
-  }
-
-  async function performClockAction(actionType, empId) {
-      const msg = document.getElementById("msg");
-      msg.innerText = "Getting location...";
-      try {
-        const now = new Date().toISOString();
-        const location = await getGeolocation();
-        msg.innerText = "Processing...";
-
-        if (navigator.onLine) {
-            if (actionType === 'clock_in') {
-              const { data: openEntry } = await _supabase.from("time_entries").select("id").eq("employee_id", empId).is("clock_out", null).maybeSingle();
-              if (openEntry) {
-                  msg.innerText = "You are already clocked in.";
-                  setMainButtonsDisabled(false);
-                  return;
-              }
-
-              const { data: employee, error: empError } = await _supabase.from("employees").select("current_project_id, client_id").eq("employee_id", empId).single();
-              if (empError || !employee) {
-                  msg.innerText = "Employee details not found.";
-                  setMainButtonsDisabled(false);
-                  return;
-              }
-
-              const { error } = await _supabase.from("time_entries").insert([{ employee_id: empId, clock_in: now, project_id: employee.current_project_id, client_id: employee.client_id, clock_in_lat: location.lat, clock_in_lon: location.lon }]);
-              if (error) throw error;
-              msg.innerText = "Clocked In!";
-
-            } else if (actionType === 'clock_out') {
-              const { data: openEntry, error: findError } = await _supabase.from("time_entries").select("id").eq("employee_id", empId).is("clock_out", null).maybeSingle();
-              if (findError) throw findError;
-              if (!openEntry) {
-                  msg.innerText = "No active clock-in found.";
-                  setMainButtonsDisabled(false);
-                  return;
-              }
-
-              const { error } = await _supabase.from("time_entries").update({ clock_out: now, clock_out_lat: location.lat, clock_out_lon: location.lon }).eq("id", openEntry.id);
-              if (error) throw error;
-              msg.innerText = "Clocked Out!";
-            }
-            setTimeout(resetUI, 2000);
-        } else {
-          saveOfflineAction({ type: actionType, employee_id: empId, timestamp: now, lat: location.lat, lon: location.lon });
-          msg.innerText = `Action saved offline. Will sync when online.`;
-          setTimeout(resetUI, 2000);
-        }
-      } catch(error) {
-          msg.innerText = `Error: ${error.message}`;
-          setMainButtonsDisabled(false);
-      }
-  }
-
-  function saveOfflineAction(action) { 
-    let p = JSON.parse(localStorage.getItem("pendingActions")) || [];
-    p.push(action);
-    localStorage.setItem("pendingActions", JSON.stringify(p));
-  }
-
-  async function syncOfflineActions() {
-    if(typeof _supabase === "undefined" || !navigator.onLine) return;
-    let pendingActions = JSON.parse(localStorage.getItem("pendingActions")) || [];
-    if (pendingActions.length === 0) return;
-    console.log(`Syncing ${pendingActions.length} pending actions...`);
-    const remainingActions = [];
-    for (const action of pendingActions) {
-      let success = false;
-      try {
-        if (action.type === 'clock_in') {
-          const { data: employee } = await _supabase.from("employees").select("current_project_id, client_id").eq("employee_id", action.employee_id).eq("active", true).single();
-          if (employee) {
-            const { error } = await _supabase.from("time_entries").insert([{ employee_id: action.employee_id, clock_in: action.timestamp, project_id: employee.current_project_id, client_id: employee.client_id, clock_in_lat: action.lat, clock_in_lon: action.lon }]);
-            if (!error) success = true; else console.error('Sync clock-in error:', error.message);
-          }
-        } else if (action.type === 'clock_out') {
-          const { data: openEntry } = await _supabase.from("time_entries").select("id").eq("employee_id", action.employee_id).is("clock_out", null).maybeSingle();
-          if (openEntry) {
-            const { error } = await _supabase.from("time_entries").update({ clock_out: action.timestamp, clock_out_lat: action.lat, clock_out_lon: action.lon }).eq("id", openEntry.id);
-            if (!error) success = true; else console.error('Sync clock-out error:', error.message);
-          } else {
-            success = true;
-          }
-        }
-      } catch (e) { console.error('Exception during sync:', e.message); }
-      if (!success) remainingActions.push(action);
-    }
-    localStorage.setItem("pendingActions", JSON.stringify(remainingActions));
-    console.log(remainingActions.length > 0 ? `${remainingActions.length} actions failed to sync.` : 'All pending actions synced!');
-  }
-
-  function getGeolocation() {
-    return new Promise((resolve) => {
-      if (!navigator.geolocation) {
-        resolve({ lat: null, lon: null });
-      } else {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
-          () => { alert("Unable to get location. Please enable location services."); resolve({ lat: null, lon: null }); }
-        );
-      }
-    });
-  }
-
-  function openAdmin() {
-    window.location.href = 'admin_login.html';
-  }
-</script>
 </body>
 </html>

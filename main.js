@@ -1,0 +1,343 @@
+
+document.addEventListener('DOMContentLoaded', () => {
+    // --- DOM Elements ---
+    const empIdInput = document.getElementById('empId');
+    const clockInButton = document.querySelector('.clock-in');
+    const clockOutButton = document.querySelector('.clock-out');
+    const msgEl = document.getElementById('msg');
+    const dateEl = document.getElementById('date');
+    const clockEl = document.getElementById('clock');
+    const modal = document.getElementById('selectionModal');
+    const selectionList = document.getElementById('employee-selection-list');
+    const cancelSelectionButton = document.querySelector('.modal-content .secondary');
+
+    // --- State ---
+    let _supabase;
+    let pendingActionType = null;
+    const SUPABASE_URL = 'https://jqppakaodpgbtxzpvsti.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxcHBha2FvZHBnYnR4enB2c3RpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExMDIxOTEsImV4cCI6MjA4NjY3ODE5MX0.ksc0lzbjlMxC942dkSBSwJHpnwTjcyFV4ZX91LFtijk';
+
+    // --- Toast Notification Function ---
+    function showToast(message, type = 'success', duration = 4000) {
+        const container = document.getElementById('notification-container');
+        if (!container) return;
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.textContent = message;
+        container.appendChild(toast);
+        setTimeout(() => toast.classList.add('show'), 10);
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => container.removeChild(toast), 300);
+        }, duration);
+    }
+    
+    // --- Initialization ---
+    async function initializeApp() {
+        try {
+            _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            // Attempt to sync any pending actions from when the app was offline
+            syncOfflineActions();
+        } catch (error) {
+            console.error('Failed to initialize Supabase:', error);
+            showToast("Error: Could not connect to the server.", 'error');
+        }
+    }
+
+    // --- Service Worker and Offline Sync ---
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));
+    }
+    window.addEventListener('online', () => {
+        showToast('You are back online. Syncing...', 'success');
+        syncOfflineActions();
+    });
+
+    // --- Clock Update ---
+    function updateClock() {
+        const now = new Date();
+        const timeZone = "America/New_York";
+        clockEl.innerText = now.toLocaleTimeString("en-US", { timeZone, hour: "2-digit", minute: "2-digit", hour12: true });
+        dateEl.innerText = now.toLocaleDateString("en-US", { timeZone, weekday: "long", month: "long", day: "numeric" });
+    }
+
+    // --- UI Management ---
+    function setMainButtonsDisabled(disabled) {
+        clockInButton.disabled = disabled;
+        clockOutButton.disabled = disabled;
+    }
+
+    function resetUI() {
+        empIdInput.value = "";
+        setMainButtonsDisabled(false);
+    }
+
+    function cancelSelection() {
+        modal.style.display = 'none';
+        resetUI();
+    }
+    
+    // --- Geolocation ---
+    async function getDeviceLocation() {
+        if (!navigator.geolocation) {
+            return null;
+        }
+        try {
+            const position = await new Promise((res, rej) => {
+                navigator.geolocation.getCurrentPosition(res, rej, {
+                    timeout: 5000,
+                    enableHighAccuracy: true
+                });
+            });
+            return {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                accuracy: position.coords.accuracy,
+            };
+        } catch (geoError) {
+            console.warn("Could not get location:", geoError.message);
+            showToast(`Could not get location: ${geoError.message}`, 'error');
+            return null;
+        }
+    }
+
+    // --- Core Logic: Database Interaction ---
+    async function getEmployeeRecords(publicEmpId) {
+        const { data, error } = await _supabase
+            .from('employees')
+            .select(`id, name, active, employee_id, client_id, client:clients(name)`)
+            .eq('employee_id', publicEmpId);
+
+        if (error) {
+            console.error("getEmployeeRecords error:", error);
+            showToast('A database error occurred.', 'error');
+            return { error };
+        }
+        return { employees: data };
+    }
+
+    async function handleClockAction(actionType) {
+        const empId = empIdInput.value.trim();
+        if (!empId) {
+            showToast("Please enter an Employee ID.", 'error');
+            return;
+        }
+
+        setMainButtonsDisabled(true);
+        showToast("Processing...");
+
+        // If offline, save action and exit
+        if (!navigator.onLine) {
+            showToast('You are offline. Action saved for later.', 'success');
+            saveOfflineAction({ type: actionType, public_employee_id: empId, timestamp: new Date().toISOString(), client_id: null });
+            setTimeout(resetUI, 3000);
+            return;
+        }
+
+        const { employees, error } = await getEmployeeRecords(empId);
+        if (error || !employees) {
+            setMainButtonsDisabled(false);
+            return; // Error toast is shown in getEmployeeRecords
+        }
+
+        if (employees.length === 0) {
+            showToast('Employee ID not found.', 'error');
+            setMainButtonsDisabled(false);
+            return;
+        }
+
+        const activeEmployees = employees.filter(emp => emp.active);
+        if (activeEmployees.length === 0) {
+            showToast('This employee ID is inactive.', 'error');
+            setMainButtonsDisabled(false);
+            return;
+        }
+        
+        // If only one employee matches, proceed directly. Otherwise, show selection modal.
+        if (activeEmployees.length === 1) {
+            await performClockAction(actionType, activeEmployees[0]);
+        } else {
+            showEmployeeSelection(activeEmployees, actionType);
+        }
+    }
+
+    function showEmployeeSelection(employees, actionType) {
+        pendingActionType = actionType;
+        selectionList.innerHTML = ''; // Clear previous options
+
+        employees.forEach(employee => {
+            const btn = document.createElement('button');
+            const clientName = employee.client ? employee.client.name : 'Unknown Client';
+            btn.innerHTML = `${employee.name} <span>at ${clientName}</span>`;
+            btn.onclick = () => selectEmployee(employee);
+            selectionList.appendChild(btn);
+        });
+
+        modal.style.display = 'flex';
+    }
+
+    async function selectEmployee(employee) {
+        modal.style.display = 'none';
+        if (pendingActionType) {
+            showToast("Processing...");
+            await performClockAction(pendingActionType, employee);
+        }
+        pendingActionType = null;
+    }
+
+    async function performClockAction(actionType, employee, isSyncing = false, syncTimestamp = null) {
+        const now = syncTimestamp || new Date().toISOString();
+        const publicEmpId = employee.employee_id;
+        const clientId = employee.client_id;
+        
+        try {
+            if (!navigator.onLine && !isSyncing) throw new Error('offline');
+
+            const location = isSyncing ? null : await getDeviceLocation();
+
+            if (actionType === 'clock_in') {
+                const { data: openEntry } = await _supabase.from("time_entries")
+                    .select("id").eq("employee_id", publicEmpId).eq("client_id", clientId).is("clock_out", null)
+                    .maybeSingle();
+                
+                if (openEntry) {
+                    if (!isSyncing) showToast("You are already clocked in.", 'error');
+                    setMainButtonsDisabled(false);
+                    return { success: false, error: 'Already clocked in' };
+                }
+
+                const { error } = await _supabase.from("time_entries").insert([{
+                    employee_id: publicEmpId,
+                    clock_in: now,
+                    client_id: clientId,
+                    location: location ? JSON.stringify(location) : null
+                }]);
+                if (error) throw error;
+                if (!isSyncing) showToast("Clocked In!", 'success');
+
+            } else if (actionType === 'clock_out') {
+                const { data: openEntry, error: findError } = await _supabase.from("time_entries")
+                    .select("id").eq("employee_id", publicEmpId).eq("client_id", clientId).is("clock_out", null)
+                    .maybeSingle();
+
+                if (findError) throw findError;
+                if (!openEntry) {
+                    if (!isSyncing) showToast("No active clock-in found.", 'error');
+                    setMainButtonsDisabled(false);
+                    return { success: false, error: 'No active clock-in' };
+                }
+                
+                const { error } = await _supabase.from("time_entries").update({ clock_out: now, location_out: location ? JSON.stringify(location) : null }).eq("id", openEntry.id);
+                if (error) throw error;
+                if (!isSyncing) showToast("Clocked Out!", 'success');
+            }
+
+            if (!isSyncing) setTimeout(resetUI, 2000);
+            return { success: true };
+
+        } catch (error) {
+            if (error.message === 'offline' || !navigator.onLine) {
+                if (!isSyncing) {
+                    showToast('You are offline. Action saved.', 'success');
+                    saveOfflineAction({ type: actionType, public_employee_id: publicEmpId, client_id: clientId, timestamp: now });
+                    setTimeout(resetUI, 2000);
+                }
+                return { success: false, error: 'offline' };
+            } else {
+                console.error('Clock action error:', error);
+                if (!isSyncing) {
+                    showToast(`Clock action error: ${error.message}`, 'error');
+                    setMainButtonsDisabled(false);
+                }
+                return { success: false, error: error.message };
+            }
+        }
+    }
+
+    // --- Offline Action Handling ---
+    function saveOfflineAction(action) {
+        try {
+            let pending = JSON.parse(localStorage.getItem("pendingActions")) || [];
+            pending.push(action);
+            localStorage.setItem("pendingActions", JSON.stringify(pending));
+        } catch (e) {
+            console.error("Could not save offline action:", e);
+            showToast("Could not save offline action.", 'error');
+        }
+    }
+
+    async function syncOfflineActions() {
+        if (!_supabase || !navigator.onLine) return;
+        
+        let pendingActions;
+        try {
+            pendingActions = JSON.parse(localStorage.getItem("pendingActions")) || [];
+        } catch (e) {
+            console.error("Could not parse pending actions, clearing:", e);
+            localStorage.setItem("pendingActions", "[]");
+            return;
+        }
+
+        if (pendingActions.length === 0) return;
+        
+        showToast(`Syncing ${pendingActions.length} offline action(s)...`);
+        
+        const remainingActions = [];
+        for (const action of pendingActions) {
+            // Basic validation of the action object
+            if (!action || !action.type || !action.public_employee_id || !action.timestamp) {
+                console.error("Skipping invalid pending action:", action);
+                continue; 
+            }
+
+            try {
+                const { employees, error } = await getEmployeeRecords(action.public_employee_id);
+                if (error || !employees || employees.length === 0) {
+                    remainingActions.push(action);
+                    continue;
+                }
+
+                const activeEmployees = employees.filter(emp => emp.active);
+                let employeeToSync = null;
+
+                if (action.client_id !== null) {
+                    employeeToSync = activeEmployees.find(emp => emp.client_id === action.client_id);
+                } else if (activeEmployees.length === 1) {
+                    // If client_id wasn't specified and there's only one active profile, we can be confident.
+                    employeeToSync = activeEmployees[0];
+                }
+
+                if (employeeToSync) {
+                    const result = await performClockAction(action.type, employeeToSync, true, action.timestamp);
+                    if (!result.success && result.error !== 'Already clocked in' && result.error !== 'No active clock-in') {
+                        remainingActions.push(action); // Only retry if it was a sync/network error, not a logical one
+                    }
+                } else {
+                    // Could not determine a unique employee, so we must keep the action pending.
+                    remainingActions.push(action);
+                }
+            } catch (syncError) {
+                console.error("Error processing a sync action:", syncError);
+                remainingActions.push(action); // Keep action for next time
+            }
+        }
+
+        localStorage.setItem("pendingActions", JSON.stringify(remainingActions));
+
+        if (remainingActions.length > 0) {
+            showToast(`${remainingActions.length} action(s) failed to sync and will be retried.`, 'error');
+        } else {
+            showToast('Offline actions synced successfully!', 'success');
+        }
+    }
+
+    // --- Event Listeners ---
+    clockInButton.addEventListener('click', () => handleClockAction('clock_in'));
+    clockOutButton.addEventListener('click', () => handleClockAction('clock_out'));
+    cancelSelectionButton.addEventListener('click', cancelSelection);
+    
+    // --- Initial Run ---
+    initializeApp();
+    updateClock();
+    setInterval(updateClock, 1000);
+});

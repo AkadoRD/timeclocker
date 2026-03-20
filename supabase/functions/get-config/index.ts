@@ -1,29 +1,37 @@
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 
-import { serve } from 'https://deno.land/std@0.131.0/http/server.ts'
-import { corsHeaders } from '../_shared/cors.ts'
-
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')
+// Define CORS headers directly in the function file for reliability
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+}
 
 serve(async (req) => {
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const responseData = {
-      supabaseUrl: SUPABASE_URL,
-      supabaseAnonKey: SUPABASE_ANON_KEY,
+    const supabaseUrl = Deno.env.get('PROJECT_URL')
+    const supabaseAnonKey = Deno.env.get('PROJECT_ANON_KEY')
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return new Response(JSON.stringify({ error: 'Missing Supabase environment variables.' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+      })
     }
 
-    return new Response(JSON.stringify(responseData), {
+    return new Response(JSON.stringify({ supabaseUrl, supabaseAnonKey }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
+      status: 400,
     })
   }
 })

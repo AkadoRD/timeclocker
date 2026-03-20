@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,60 +6,108 @@
     <title>Admin Login</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; background-color: #f8f9fa; }
-        #login-card { background: white; padding: 3rem; border-radius: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.05); text-align: center; width: 90%; max-width: 400px; }
-        h2 { color: #2f3640; margin-bottom: 2rem; }
-        input { width: 100%; padding: 1rem; margin-bottom: 1.5rem; border: 2px solid #dcdde1; border-radius: 12px; font-size: 1rem; box-sizing: border-box; }
-        button { width: 100%; padding: 1.2rem; background-color: #2cb3ba; color: white; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }
+        body { display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f8f9fa; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        .container { background: white; padding: 40px; border-radius: 16px; box-shadow: 0 8px 30px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
+        h2 { color: #2f3640; margin-bottom: 20px; }
+        input { width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box; }
+        button { background-color: #2cb3ba; color: white; border: none; padding: 12px 18px; border-radius: 10px; cursor: pointer; font-size: 1rem; font-weight: 500; width: 100%; transition: background-color 0.2s; }
         button:hover { background-color: #259399; }
-        #error-message { color: #c0392b; margin-top: 1.5rem; font-weight: 500; min-height: 20px; }
+        .message { margin-top: 15px; }
+        .error { color: red; }
+        .success { color: green; }
+        a { color: #2cb3ba; text-decoration: none; margin-top: 15px; display: inline-block; }
+        a:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
-    <div id="login-card">
+    <div id="login-container" class="container">
         <h2>Admin Login</h2>
-        <input type="email" id="email" placeholder="Email">
-        <input type="password" id="password" placeholder="Password">
-        <button id="login-button">Login</button>
-        <p id="error-message"></p>
+        <form id="login-form">
+            <input type="email" id="email" placeholder="Email" required>
+            <input type="password" id="password" placeholder="Password" required>
+            <button type="submit">Login</button>
+        </form>
+        <p id="login-message" class="message error" style="display: none;"></p>
+        <a href="#" id="forgot-password-link">Forgot Password?</a>
     </div>
+
+    <div id="reset-password-container" class="container" style="display: none;">
+        <h2>Reset Password</h2>
+        <form id="reset-password-form">
+            <input type="email" id="reset-email" placeholder="Enter your email" required>
+            <button type="submit">Send Reset Link</button>
+        </form>
+        <p id="reset-message" class="message" style="display: none;"></p>
+        <a href="#" id="back-to-login-link">Back to Login</a>
+    </div>
+
     <script>
-        let _supabase;
+        const SUPABASE_URL = 'https://jqppakaodpgbtxzpvsti.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxcHBha2FvZHBnYnR4enB2c3RpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExMDIxOTEsImV4cCI6MjA4NjY3ODE5MX0.ksc0lzbjlMxC942dkSBSwJHpnwTjcyFV4ZX91LFtijk';
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        async function initializeSupabase() {
-            try {
-                const response = await fetch('./supabase/functions/get-config');
-                if (!response.ok) throw new Error(`Failed to fetch config: ${response.statusText}`);
-                const config = await response.json();
-                if (!config.supabaseUrl || !config.supabaseAnonKey) throw new Error('Supabase URL or Anon Key is missing.');
-                _supabase = supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
-            } catch (error) {
-                console.error('Initialization error:', error);
-                document.getElementById('error-message').textContent = "Error: Could not connect to the server.";
+        const loginContainer = document.getElementById('login-container');
+        const resetContainer = document.getElementById('reset-password-container');
+        const forgotLink = document.getElementById('forgot-password-link');
+        const backToLoginLink = document.getElementById('back-to-login-link');
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const { data: { session } } = await _supabase.auth.getSession();
+            if (session) {
+                window.location.href = 'admin.html';
             }
-        }
+        });
+        
+        forgotLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            loginContainer.style.display = 'none';
+            resetContainer.style.display = 'block';
+        });
 
-        document.addEventListener('DOMContentLoaded', () => {
-            initializeSupabase();
+        backToLoginLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            resetContainer.style.display = 'none';
+            loginContainer.style.display = 'block';
+        });
 
-            document.getElementById('login-button').addEventListener('click', async () => {
-                if (!_supabase) { 
-                    document.getElementById('error-message').textContent = "Connecting to server... please wait.";
-                    return; 
-                }
-                const email = document.getElementById('email').value;
-                const password = document.getElementById('password').value;
-                const { data, error } = await _supabase.auth.signInWithPassword({
-                    email,
-                    password,
-                });
+        document.getElementById('login-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const loginMessage = document.getElementById('login-message');
 
-                if (error) {
-                    document.getElementById('error-message').textContent = error.message;
-                } else {
+            try {
+                const { data, error } = await _supabase.auth.signInWithPassword({ email, password });
+                if (error) throw error;
+                if (data.user) {
                     window.location.href = 'admin.html';
                 }
-            });
+            } catch (error) {
+                loginMessage.textContent = 'Error: ' + error.message;
+                loginMessage.style.display = 'block';
+            }
+        });
+
+        document.getElementById('reset-password-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const email = document.getElementById('reset-email').value;
+            const resetMessage = document.getElementById('reset-message');
+
+            try {
+                const { error } = await _supabase.auth.resetPasswordForEmail(email, {
+                    redirectTo: window.location.origin + '/update-password.html'
+                });
+                
+                if (error) throw error;
+
+                resetMessage.textContent = 'Success! If an account exists for this email, a password reset link has been sent.';
+                resetMessage.className = 'message success';
+                resetMessage.style.display = 'block';
+            } catch (error) {
+                resetMessage.textContent = 'Error: ' + error.message;
+                resetMessage.className = 'message error';
+                resetMessage.style.display = 'block';
+            }
         });
     </script>
 </body>

@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,701 +6,87 @@
     <title>Admin Dashboard</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="icons/icon-192.png" type="image/png">
+    <link rel="stylesheet" href="admin.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 20px; background-color: #f8f9fa; color: #333; }
-        .panel { background: white; padding: 25px; border-radius: 16px; box-shadow: 0 8px 30px rgba(0,0,0,0.07); max-width: 900px; margin: 20px auto; display: none; }
-        .panel.active { display: block; }
-        button { background-color: #2cb3ba; color: white; border: none; padding: 12px 18px; border-radius: 10px; cursor: pointer; font-size: 1rem; font-weight: 500; margin: 5px; transition: background-color: 0.2s; }
-        button:hover { background-color: #259399; }
-        button.secondary { background-color: #7f8c8d; }
-        button.secondary:hover { background-color: #6c7a7d; }
-        button.warning { background-color: #f39c12; }
-        button.warning:hover { background-color: #e67e22; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ecf0f1; }
-        th { background-color: #f8f9fa; font-weight: 600; }
-        h2, h3 { color: #2f3640; border-bottom: 2px solid #2cb3ba; padding-bottom: 10px; margin-top: 0; }
-        input, select { width: calc(100% - 20px); padding: 10px; margin-bottom: 12px; border-radius: 8px; border: 1px solid #dcdde1; font-size: 1rem; }
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .form-container { margin-top:20px; padding:20px; border:1px solid #eee; border-radius:10px; background:#fdfdfd; }
-        #employeeFormContainer { display: none; }
-        #toast-container { position: fixed; top: 20px; right: 20px; z-index: 12000; }
-        .toast { padding: 15px 20px; margin-bottom: 10px; border-radius: 8px; color: white; font-weight: 500; box-shadow: 0 4px 15px rgba(0,0,0,0.1); transition: all 0.5s ease; opacity: 0; transform: translateX(100%); }
-        .toast.show { opacity: 1; transform: translateX(0); }
-        .toast.toast-success { background-color: #27ae60; }
-        .toast.toast-error { background-color: #c0392b; }
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 11000; }
-        .modal { background: white; padding: 30px; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); width: 90%; max-width: 450px; text-align: center; }
-        .modal-actions { margin-top: 20px; }
-    </style>
+    <script src="admin.js" defer></script>
 </head>
 <body>
+    <div id="app-container" style="display: none;">
+        <button id="logout-button" class="logout-btn secondary">Logout</button>
 
-<div id="adminPanel" class="panel active"></div>
-<div id="manageEmployeesPanel" class="panel"></div>
-<div id="manageProjectsPanel" class="panel"></div>
-<div id="timeEntriesPanel" class="panel"></div>
-<div id="reportsPanel" class="panel"></div>
-<div id="toast-container"></div>
-
-<div id="confirm-modal-overlay" class="modal-overlay">
-    <div class="modal">
-        <div class="modal-content"><h3 id="modal-title"></h3><p id="modal-message"></p></div>
-        <div class="modal-actions">
-            <button id="modal-confirm-button" class="warning">Confirm</button>
-            <button id="modal-cancel-button" class="secondary">Cancel</button>
+        <div id="main-nav">
+            <button class="nav-button active" data-panel="dashboard-panel">Dashboard</button>
+            <button class="nav-button" data-panel="reports-panel">Reports</button>
+            <button class="nav-button" data-panel="employees-panel">Employees</button>
+            <button class="nav-button" data-panel="clients-panel">Clients</button>
+            <button class="nav-button" data-panel="time-entries-panel">Time Entries</button>
         </div>
-    </div>
-</div>
 
-<div id="edit-entry-modal-overlay" class="modal-overlay">
-    <div class="modal">
-        <h3>Edit Time Entry</h3>
-        <input type="hidden" id="editEntryId">
-        <div class="form-grid">
-            <div>Clock In: <input type="datetime-local" id="editClockIn"></div>
-            <div>Clock Out: <input type="datetime-local" id="editClockOut"></div>
+        <div id="dashboard-panel" class="panel active">
+            <h2>Dashboard</h2>
+            <h3>Duplicate Employee IDs</h3>
+            <button onclick="findDuplicateIds()">Find Duplicates</button>
+            <div id="duplicate-id-results"></div>
         </div>
-        <div class="modal-actions">
-            <button onclick="saveTimeEntry()">Save Changes</button>
-            <button onclick="document.getElementById('edit-entry-modal-overlay').style.display='none'" class="secondary">Cancel</button>
+
+        <div id="reports-panel" class="panel">
+            <h2>Export Time Report</h2>
+            <div>
+                <label for="start-date">Start Date:</label>
+                <input type="date" id="start-date">
+                <label for="end-date">End Date:</label>
+                <input type="date" id="end-date">
+                <button onclick="generateReport()" id="generate-report-btn">Generate Report</button>
+            </div>
+            <div id="report-results"></div>
         </div>
-    </div>
-</div>
-
-<script>
-let _supabase;
-let historyStack = ['adminPanel'];
-let allProjects = [];
-let confirmCallback = null;
-let numericClientId = null;
-let timeEntriesSubscription = null;
-
-async function initializeApp() {
-    try {
-        const response = await fetch('./supabase/functions/get-config');
-        if (!response.ok) throw new Error(`Failed to fetch config: ${response.statusText}`);
-        const config = await response.json();
-        if (!config.supabaseUrl || !config.supabaseAnonKey) throw new Error('Supabase URL or Anon Key is missing.');
-        _supabase = supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
         
-        const { data: { session }, error } = await _supabase.auth.getSession();
-        if (error || !session) {
-            window.location.href = 'admin_login.html';
-            return;
-        }
-
-        const user = session.user;
-        numericClientId = await getClientIdForAdmin(user.id);
-        if (!numericClientId) throw new Error('Could not determine client ID for the current admin.');
-
-        const adminPanel = document.getElementById('adminPanel');
-        adminPanel.innerHTML = `
-            <h2>Admin Dashboard</h2>
-            <p>Welcome, ${user.email}</p>
-            <div id="adminActions">
-                <button onclick="showPanel('manageEmployeesPanel')">Manage Employees</button>
-                <button onclick="showPanel('manageProjectsPanel')">Manage Projects</button>
-                <button onclick="showPanel('timeEntriesPanel')">View Time Entries</button>
-                <button onclick="showPanel('reportsPanel')">Reports</button>
-            </div>
-            <div id="live-status-container" style="margin-top: 30px;">
-                <h3>Currently Clocked-In</h3>
-                <table id="live-status-table">
-                    <thead>
-                        <tr>
-                            <th>Employee</th>
-                            <th>Clocked In At</th>
-                        </tr>
-                    </thead>
-                    <tbody id="live-status-tbody"></tbody>
-                </table>
-            </div>
-            <button onclick="logout()" class="warning">Logout</button>
-        `;
-        showPanel('adminPanel');
-
-    } catch (error) {
-        console.error('Initialization error:', error);
-        document.body.innerHTML = `<div style="text-align:center; padding:50px;"><h2>Error</h2><p>${error.message}</p><a href="admin_login.html">Go to Login</a></div>`;
-    }
-}
-
-document.addEventListener('DOMContentLoaded', initializeApp);
-
-async function getClientIdForAdmin(adminId) {
-    // Placeholder: In a real app, you would have a table mapping admin user_ids to client_ids
-    console.log("Fetching client ID for admin:", adminId);
-    // For this example, we'll assume a direct mapping or a lookup. 
-    // Let's hardcode it for now, but this should be dynamic.
-    const { data, error } = await _supabase.from('clients').select('id').eq('admin_id', adminId).single();
-    if (error || !data) {
-        console.error('Could not find a client for this admin. Please ensure mapping is correct.', error);
-        // Fallback or specific error handling
-        return 1; // temporary fallback
-    }
-    return data.id;
-}
-
-// ... (rest of the functions: showToast, showConfirmModal, etc. remain the same)
-
-
-function showToast(message, type = 'success') {
-    const container = document.getElementById('toast-container');
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    toast.innerText = message;
-    container.appendChild(toast);
-    setTimeout(() => { toast.classList.add('show'); }, 10);
-    setTimeout(() => {
-        toast.classList.remove('show');
-        toast.addEventListener('transitionend', () => toast.remove());
-    }, 3000);
-}
-
-function showConfirmModal(title, message, onConfirm) {
-    document.getElementById('modal-title').textContent = title;
-    document.getElementById('modal-message').textContent = message;
-    confirmCallback = onConfirm;
-    document.getElementById('confirm-modal-overlay').style.display = 'flex';
-}
-
-function hideConfirmModal() {
-    document.getElementById('confirm-modal-overlay').style.display = 'none';
-    confirmCallback = null;
-}
-
-document.getElementById('modal-confirm-button').addEventListener('click', () => { if (confirmCallback) confirmCallback(); hideConfirmModal(); });
-document.getElementById('modal-cancel-button').addEventListener('click', hideConfirmModal);
-
-function unsubscribeFromTimeEntries() {
-    if (timeEntriesSubscription) {
-        _supabase.removeChannel(timeEntriesSubscription);
-        timeEntriesSubscription = null;
-    }
-}
-
-function subscribeToTimeEntries() {
-    if (timeEntriesSubscription || !numericClientId) return;
-
-    const handleRealtimeChange = async (payload) => {
-        console.log('Realtime change received!', payload);
-
-        const getEmployeeName = async (employeeId) => {
-            if (!employeeId) return 'Someone';
-            // First, try to find the name from the already loaded employee data on other panels if available
-            // This is an optimization, but for now we'll just fetch.
-            const { data, error } = await _supabase.from('employees').select('name').eq('id', employeeId).single();
-            return error || !data ? 'An employee' : data.name;
-        };
+        <div id="employees-panel" class="panel">
+            <h2>Manage Employees</h2>
+            <form id="employee-form">
+                <input type="hidden" id="employee-id-hidden">
+                <input type="text" id="employee-name" placeholder="Employee Name" required>
+                <input type="text" id="employee-id" placeholder="Employee ID" required>
+                <select id="employee-client" required></select>
+                <button type="submit">Save Employee</button>
+            </form>
+            <table id="employees-table">
+                <thead><tr><th>Name</th><th>ID</th><th>Client</th><th>Active</th><th>Actions</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
         
-        let toastMessage = '';
-
-        switch (payload.eventType) {
-            case 'INSERT':
-                if (payload.new.clock_out === null) {
-                    const name = await getEmployeeName(payload.new.employee_id);
-                    toastMessage = `${name} clocked in.`;
-                }
-                break;
-            case 'UPDATE':
-                if (payload.old.clock_out === null && payload.new.clock_out !== null) {
-                    const name = await getEmployeeName(payload.new.employee_id);
-                    toastMessage = `${name} clocked out.`;
-                } else {
-                    toastMessage = 'A time entry was updated.';
-                }
-                break;
-            case 'DELETE':
-                // It's hard to know what this was without the employee name, which might be gone
-                toastMessage = 'A time entry was deleted.';
-                break;
-        }
-
-        if (toastMessage) {
-            showToast(toastMessage, 'success');
-        }
-
-        // Refresh relevant views
-        if (document.getElementById('adminPanel').classList.contains('active')) {
-            renderCurrentlyClockedIn();
-        }
-        if (document.getElementById('timeEntriesPanel').classList.contains('active')) {
-            renderTimeEntries();
-        }
-    };
-
-    timeEntriesSubscription = _supabase.channel('time-entries-channel')
-        .on(
-            'postgres_changes',
-            {
-                event: '*',
-                schema: 'public',
-                table: 'time_entries',
-                filter: `client_id=eq.${numericClientId}`
-            },
-            handleRealtimeChange
-        )
-        .subscribe((status, err) => {
-            if (status === 'SUBSCRIBED') {
-                console.log('Successfully subscribed to real-time entries.');
-                showToast('Live connection active.', 'success');
-            } else if (err) {
-                console.error('Realtime subscription error:', err);
-                showToast('Live update connection failed.', 'error');
-            }
-        });
-}
-
-function showPanel(panelId) {
-    if (panelId !== 'timeEntriesPanel' && panelId !== 'adminPanel') {
-        unsubscribeFromTimeEntries();
-    }
-
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    const panelElement = document.getElementById(panelId);
-    if (panelElement) {
-        panelElement.classList.add('active');
-    } else {
-        console.error(`Panel with ID '${panelId}' not found.`);
-        return;
-    }
-
-    if (historyStack[historyStack.length - 1] !== panelId) {
-        historyStack.push(panelId);
-    }
-
-    const panelActions = {
-        adminPanel: () => {
-            fetchAllProjects();
-            renderCurrentlyClockedIn();
-            subscribeToTimeEntries();
-        },
-        manageEmployeesPanel: renderEmployeeList,
-        manageProjectsPanel: renderProjectsList,
-        timeEntriesPanel: () => {
-            renderTimeEntries();
-            subscribeToTimeEntries();
-        },
-        reportsPanel: renderReportsPanel
-    };
-    
-    if (panelActions[panelId]) {
-        panelActions[panelId]();
-    } else {
-        console.error("Unknown panel ID:", panelId);
-    }
-}
-
-function goBack() {
-    if (historyStack.length <= 1) return;
-    historyStack.pop();
-    const prevPanelId = historyStack[historyStack.length - 1];
-    
-    if (prevPanelId !== 'timeEntriesPanel' && prevPanelId !== 'adminPanel') {
-        unsubscribeFromTimeEntries();
-    }
-    
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    const panelElement = document.getElementById(prevPanelId);
-     if (panelElement) {
-        panelElement.classList.add('active');
-    } else {
-        console.error(`Panel with ID '${prevPanelId}' not found on goBack.`);
-        showPanel('adminPanel'); 
-        return;
-    }
-
-    const panelActions = {
-        adminPanel: () => {
-            fetchAllProjects();
-            renderCurrentlyClockedIn();
-            subscribeToTimeEntries();
-        },
-        manageEmployeesPanel: renderEmployeeList,
-        manageProjectsPanel: renderProjectsList,
-        timeEntriesPanel: () => {
-            renderTimeEntries();
-            subscribeToTimeEntries();
-        },
-        reportsPanel: renderReportsPanel
-    };
-
-    if (panelActions[prevPanelId]) {
-        panelActions[prevPanelId]();
-    }
-}
-
-async function logout() {
-    unsubscribeFromTimeEntries();
-    const { error } = await _supabase.auth.signOut();
-    if (error) {
-        console.error('Error logging out:', error);
-        showToast('Error logging out.', 'error');
-    } else {
-        window.location.href = 'admin_login.html';
-    }
-}
-
-async function fetchAllProjects() {
-    if (!numericClientId) return;
-    const { data, error } = await _supabase.from('projects').select('id, name').eq('client_id', numericClientId).order('name');
-    allProjects = error ? [] : data;
-}
-
-async function renderCurrentlyClockedIn() {
-    if (!numericClientId) return;
-    const tbody = document.getElementById('live-status-tbody');
-    if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="2">Loading...</td></tr>';
-
-    const { data, error } = await _supabase
-        .from('time_entries')
-        .select('clock_in, employee:employees(name)')
-        .eq('client_id', numericClientId)
-        .is('clock_out', null)
-        .order('clock_in', { ascending: true });
-
-    if (error) {
-        tbody.innerHTML = '<tr><td colspan="2" style="color:red;">Error loading status</td></tr>';
-        console.error('Error fetching clocked in employees:', error);
-        return;
-    }
-
-    if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="2">No employees are currently clocked in.</td></tr>';
-        return;
-    }
-
-    tbody.innerHTML = data.map(entry => {
-        const employeeName = entry.employee ? entry.employee.name : 'Unknown Employee';
-        return `<tr>
-            <td>${employeeName}</td>
-            <td>${new Date(entry.clock_in).toLocaleTimeString()}</td>
-        </tr>`
-    }).join('');
-}
-
-async function renderProjectsList(editProjectId = null, currentName = '') {
-    const panel = document.getElementById('manageProjectsPanel');
-    panel.innerHTML = '<h2>Manage Projects</h2><p>Loading...</p>';
-    await fetchAllProjects();
-
-    panel.innerHTML = `
-        <h2>Manage Projects</h2>
-        <button onclick="goBack()" class="secondary">Back</button>
-        <div class="form-container">
-            <h3>${editProjectId ? 'Edit Project' : 'Create New Project'}</h3>
-            <input type="hidden" id="projectId" value="${editProjectId || ''}">
-            <input type="text" id="projectName" placeholder="Project Name" value="${currentName.replace(/'/g, "&apos;").replace(/"/g, "&quot;").replace(/`/g, '&#96;')}">
-            <button onclick="saveProject()">${editProjectId ? 'Save Changes' : 'Create Project'}</button>
-            ${editProjectId ? `<button onclick="renderProjectsList()" class="secondary">Cancel Edit</button>` : ''}
+        <div id="clients-panel" class="panel">
+            <h2>Manage Clients</h2>
+            <form id="client-form">
+                <input type="hidden" id="client-id-hidden">
+                <input type="text" id="client-name" placeholder="Client Name" required>
+                <button type="submit">Save Client</button>
+            </form>
+            <table id="clients-table">
+                <thead><tr><th>Name</th><th>Actions</th></tr></thead>
+                <tbody></tbody>
+            </table>
         </div>
-        <h3>Existing Projects</h3>
-        <table>
-            <thead><tr><th>Project Name</th><th>Actions</th></tr></thead>
-            <tbody>
-            ${allProjects.map(p => `
-                <tr>
-                    <td>${p.name}</td>
-                    <td>
-                        <button onclick="renderProjectsList('${p.id}', '${p.name.replace(/'/g, `\'`)}')" class="secondary">Edit</button>
-                        <button onclick="deleteProject('${p.id}','${p.name.replace(/'/g, `\'`)}')" class="warning">Delete</button>
-                    </td>
-                </tr>`).join('')}
-            </tbody>
-        </table>`;
-}
 
-async function saveProject() {
-    const projectId = document.getElementById('projectId').value;
-    const projectName = document.getElementById('projectName').value.trim();
-    if (!projectName) { showToast('Project name cannot be empty.', 'error'); return; }
-    
-    let response;
-    if (projectId) {
-        response = await _supabase.from('projects').update({ name: projectName }).eq('id', projectId);
-    } else {
-        response = await _supabase.from('projects').insert([{ name: projectName, client_id: numericClientId }]).select();
-    }
+        <div id="time-entries-panel" class="panel">
+            <h2>Manual Time Entries</h2>
+            <form id="time-entry-form">
+                <input type="hidden" id="time-entry-id-hidden">
+                <select id="time-entry-employee" required></select>
+                <input type="datetime-local" id="time-entry-clock-in" required>
+                <input type="datetime-local" id="time-entry-clock-out">
+                <button type="submit">Save Entry</button>
+            </form>
 
-    if (response.error) showToast('Error: ' + response.error.message, 'error');
-    else { showToast(projectId ? 'Project updated!' : 'Project created!', 'success'); renderProjectsList(); }
-}
-
-async function deleteProject(projectId, name) {
-    showConfirmModal(`Delete ${name}`, `Are you sure?`, async () => {
-        const { error } = await _supabase.from('projects').delete().eq('id', projectId);
-        if (error) showToast('Error: ' + error.message, 'error');
-        else { showToast('Project deleted.', 'success'); renderProjectsList(); }
-    });
-}
-
-async function renderEmployeeList() {
-    const panel = document.getElementById('manageEmployeesPanel');
-    panel.innerHTML = '<h2>Manage Employees</h2><p>Loading...</p>';
-    await fetchAllProjects();
-    const { data: employees, error } = await _supabase.from('employees').select('*, project:projects(name)').eq('client_id', numericClientId).order('employee_id');
-    if (error) { panel.innerHTML += `<p style="color:red">${error.message}</p>`; return; }
-
-    let projectOptions = allProjects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-    
-    panel.innerHTML = `
-        <h2>Manage Employees</h2>
-        <button onclick="goBack()" class="secondary">Back</button>
-        <button onclick="openEmployeeForm()" style="margin-left: 10px;">Add New Employee</button>
-        <div id="employeeFormContainer" class="form-container"></div>
-        <h3>Existing Employees</h3>
-        <table>
-            <thead><tr><th>ID</th><th>Name</th><th>Project</th><th>Status</th><th>Actions</th></tr></thead>
-            <tbody>
-            ${employees.map(emp => `
-                <tr>
-                    <td>${emp.employee_id}</td>
-                    <td>${emp.name}</td>
-                    <td>${emp.project ? emp.project.name : 'None'}</td>
-                    <td>${emp.active ? 'Active' : 'Inactive'}</td>
-                    <td>
-                        <button onclick="openEmployeeForm('${emp.id}')" class="secondary">Edit</button>
-                        <button onclick="deleteEmployee('${emp.id}', '${emp.name.replace(/'/g, `\'`)}')" class="warning">Delete</button>
-                    </td>
-                </tr>`).join('')}
-            </tbody>
-        </table>`;
-    
-    document.querySelector('#employeeFormContainer').innerHTML = `
-        <h3 id="employeeFormTitle">Add/Edit Employee</h3>
-        <input type="hidden" id="empDbId">
-        <div class="form-grid">
-            <div>Employee ID: <input type="text" id="empId"></div>
-            <div>Name: <input type="text" id="empName"></div>
-            <div>Hourly Rate: <input type="number" id="empRate"></div>
-            <div>PIN (4-digits): <input type="password" id="empPin" placeholder="Required for new employee" maxlength="4"></div>
-            <div>Project: <select id="empProject"><option value="">None</option>${projectOptions}</select></div>
-            <div><label><input type="checkbox" id="empActive" checked> Active</label></div>
+            <h2>Recent Time Entries</h2>
+            <table id="time-entries-table">
+                <thead><tr><th>Employee</th><th>Client</th><th>Clock In</th><th>Clock Out</th><th>Location</th><th>Actions</th></tr></thead>
+                <tbody></tbody>
+            </table>
         </div>
-        <button id="saveEmpButton" onclick="saveEmployee()">Save</button>
-        <button onclick="document.getElementById('employeeFormContainer').style.display='none'" class="secondary">Cancel</button>
-    `;
-}
 
-async function openEmployeeForm(dbId = null) {
-    const form = document.getElementById('employeeFormContainer');
-    document.getElementById('empPin').value = '';
-    if (!dbId) {
-        document.getElementById('employeeFormTitle').textContent = 'Add New Employee';
-        document.getElementById('empDbId').value = '';
-        document.getElementById('empId').value = '';
-        document.getElementById('empName').value = '';
-        document.getElementById('empRate').value = '';
-        document.getElementById('empPin').placeholder = 'Required';
-        document.getElementById('empProject').value = '';
-        document.getElementById('empActive').checked = true;
-    } else {
-        const { data, error } = await _supabase.from('employees').select('*').eq('id', dbId).single();
-        if(error) { showToast('Could not fetch employee data.', 'error'); return; }
-        document.getElementById('employeeFormTitle').textContent = 'Edit Employee';
-        document.getElementById('empDbId').value = data.id;
-        document.getElementById('empId').value = data.employee_id;
-        document.getElementById('empName').value = data.name;
-        document.getElementById('empRate').value = data.hourly_rate;
-        document.getElementById('empPin').placeholder = 'Leave blank to keep current';
-        document.getElementById('empProject').value = data.current_project_id || '';
-        document.getElementById('empActive').checked = data.active;
-    }
-    form.style.display = 'block';
-}
-
-async function saveEmployee() {
-    const dbId = document.getElementById('empDbId').value;
-    const employeeData = {
-        employee_id: document.getElementById('empId').value,
-        name: document.getElementById('empName').value,
-        hourly_rate: document.getElementById('empRate').value,
-        current_project_id: document.getElementById('empProject').value || null,
-        client_id: numericClientId,
-        active: document.getElementById('empActive').checked
-    };
-    const pin = document.getElementById('empPin').value;
-    if (pin) employeeData.pin = pin;
-
-    if (!dbId && !pin) { showToast('PIN is required for new employees', 'error'); return; }
-    if (!employeeData.employee_id || !employeeData.name) { showToast('Employee ID and Name are required.', 'error'); return; }
-
-    let response;
-    if (dbId) {
-        response = await _supabase.from('employees').update(employeeData).eq('id', dbId);
-    } else {
-        response = await _supabase.from('employees').insert([employeeData]);
-    }
-
-    if (response.error) {
-        showToast(`Error: ${response.error.message}`, 'error');
-    } else {
-        showToast(dbId ? 'Employee updated!' : 'Employee created!', 'success');
-        document.getElementById('employeeFormContainer').style.display = 'none';
-        renderEmployeeList();
-    }
-}
-
-async function deleteEmployee(dbId, name) {
-    showConfirmModal(`Delete ${name}`, `Are you sure?`, async () => {
-        const { error } = await _supabase.from('employees').delete().eq('id', dbId);
-        if (error) showToast('Error: ' + error.message, 'error');
-        else { showToast('Employee deleted.', 'success'); renderEmployeeList(); }
-    });
-}
-
-async function renderTimeEntries() {
-    const panel = document.getElementById('timeEntriesPanel');
-    const headerHTML = `
-        <h2>Recent Time Entries</h2>
-        <button onclick="goBack()" class="secondary">Back</button>
-    `;
-    panel.innerHTML = headerHTML + '<p>Loading...</p>';
-
-    const { data, error } = await _supabase.from('time_entries').select('*, employee:employees(name)').eq('client_id', numericClientId).order('clock_in', { ascending: false }).limit(100);
-    if(error) { panel.innerHTML = headerHTML + `<p style="color:red">${error.message}</p>`; return; }
-    
-    const tableHTML = `
-        <table>
-            <thead><tr><th>Employee</th><th>Clock In</th><th>Clock Out</th><th>Actions</th></tr></thead>
-            <tbody id="time-entries-tbody">
-            ${data.map(entry => `
-                <tr id="entry-${entry.id}">
-                    <td>${entry.employee ? entry.employee.name : 'N/A'}</td>
-                    <td>${new Date(entry.clock_in).toLocaleString()}</td>
-                    <td>${entry.clock_out ? new Date(entry.clock_out).toLocaleString() : '<b>Still Clocked In</b>'}</td>
-                    <td>
-                        ${!entry.clock_out ? `<button onclick="closeEntry('${entry.id}')" class="warning">Force Clock-Out</button>` : ''}
-                        <button onclick="openEditEntryModal('${entry.id}', '${entry.clock_in}', '${entry.clock_out}')" class="secondary">Edit</button>
-                    </td>
-                </tr>`).join('')}
-            </tbody>
-        </table>`;
-    panel.innerHTML = headerHTML + tableHTML;
-}
-
-function toLocalISOString(date) {
-    if (!date) return '';
-    const d = new Date(date);
-    const pad = (num) => num.toString().padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-function openEditEntryModal(entryId, clockIn, clockOut) {
-    document.getElementById('editEntryId').value = entryId;
-    document.getElementById('editClockIn').value = toLocalISOString(clockIn);
-    document.getElementById('editClockOut').value = toLocalISOString(clockOut);
-    document.getElementById('edit-entry-modal-overlay').style.display = 'flex';
-}
-
-async function saveTimeEntry() {
-    const entryId = document.getElementById('editEntryId').value;
-    const clockIn = document.getElementById('editClockIn').value;
-    let clockOut = document.getElementById('editClockOut').value;
-
-    const updateData = { clock_in: clockIn, clock_out: clockOut || null };
-
-    const { error } = await _supabase.from('time_entries').update(updateData).eq('id', entryId);
-    if (error) {
-        showToast('Error updating entry: ' + error.message, 'error');
-    } else {
-        showToast('Time entry updated!', 'success');
-        document.getElementById('edit-entry-modal-overlay').style.display = 'none';
-    }
-}
-
-async function closeEntry(entryId) {
-    const { error } = await _supabase.from('time_entries').update({ clock_out: new Date().toISOString() }).eq('id', entryId);
-    if (error) showToast('Error: ' + error.message, 'error');
-    else { showToast('Entry closed.', 'success');
-   }
-}
-
-function renderReportsPanel() {
-    const panel = document.getElementById('reportsPanel');
-    panel.innerHTML = `
-        <h2>Generate Report</h2>
-        <button onclick="goBack()" class="secondary">Back</button>
-        <div class="form-container">
-             <div class="form-grid">
-                <div>Start Date: <input type="date" id="reportStartDate"></div>
-                <div>End Date: <input type="date" id="reportEndDate"></div>
-            </div>
-            <button onclick="generateReport()">Generate & Export CSV</button>
-        </div>
-        <div id="reportOutput"></div>
-    `;
-}
-
-function toYYYYMMDDHHMMSS(date) {
-    const d = new Date(date);
-    const pad = (num) => num.toString().padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-}
-
-async function generateReport() {
-    const startDate = document.getElementById('reportStartDate').value;
-    const endDate = document.getElementById('reportEndDate').value;
-    if (!startDate || !endDate) { showToast('Please select a start and end date.', 'error'); return; }
-
-    const start = new Date(startDate).toISOString();
-    const end = new Date(endDate); end.setHours(23,59,59,999); 
-
-    const { data, error } = await _supabase
-        .from('time_entries')
-        .select('*, employee:employees!left(employee_id, name, hourly_rate), project:projects!left(id, name)')
-        .eq('client_id', numericClientId)
-        .gte('clock_in', start)
-        .lte('clock_in', end.toISOString())
-        .not('clock_out', 'is', null)
-        .order('clock_in');
-
-    if (error) { showToast('Error fetching report data: ' + error.message, 'error'); return; }
-    if (!data.length) { showToast('No data for this period.', 'warning'); return; }
-
-    const csvData = data.map(entry => {
-        const clockIn = new Date(entry.clock_in);
-        const clockOut = new Date(entry.clock_out);
-        const duration = (clockOut - clockIn) / (1000 * 60 * 60); // hours
-        const rate = entry.employee ? (entry.employee.hourly_rate || 0) : 0;
-        const total = (duration * rate).toFixed(2);
-        return {
-            employee_id: entry.employee ? entry.employee.employee_id : 'N/A',
-            employee_name: entry.employee ? entry.employee.name : 'Deleted Employee',
-            project_id: entry.project ? entry.project.id : 'N/A',
-            project_name: entry.project ? entry.project.name : 'No Project',
-            clock_in: toYYYYMMDDHHMMSS(clockIn),
-            clock_out: toYYYYMMDDHHMMSS(clockOut),
-            duration_hours: duration.toFixed(3),
-            hourly_rate: rate,
-            total_pay: total
-        };
-    });
-    exportToCSV(csvData);
-}
-
-function exportToCSV(data) {
-    if (data.length === 0) return;
-    const header = Object.keys(data[0]);
-    const csv = [
-        header.join(','),
-        ...data.map(row => header.map(field => `"${String(row[field]).replace(/"/g, '""')}"`).join(','))
-    ].join('
-');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'report.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-}
-
-</script>
+    </div>
+    <div id="notification-container"></div>
 </body>
 </html>

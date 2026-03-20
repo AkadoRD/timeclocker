@@ -1,0 +1,108 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Signup</title>
+    <link rel="icon" href="icons/icon-192.png" type="image/png">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; background-color: #f8f9fa; }
+        #signup-card { background: white; padding: 3rem; border-radius: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.05); text-align: center; width: 90%; max-width: 450px; }
+        h2 { color: #2f3640; margin-bottom: 2rem; }
+        input { width: 100%; padding: 1rem; margin-bottom: 1.5rem; border: 2px solid #dcdde1; border-radius: 12px; font-size: 1rem; box-sizing: border-box; }
+        button { width: 100%; padding: 1.2rem; background-color: #27ae60; color: white; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }
+        button:hover { background-color: #229954; }
+        #error-message { color: #c0392b; margin-top: 1.5rem; font-weight: 500; min-height: 20px; }
+        .login-link { margin-top: 1.5rem; font-size: 0.9rem; }
+        .login-link a { color: #2cb3ba; text-decoration: none; font-weight: 500; }
+    </style>
+</head>
+<body>
+    <div id="signup-card">
+        <h2>Create Admin Account</h2>
+        <input type="email" id="email" placeholder="Email Address">
+        <input type="password" id="password" placeholder="Password (at least 6 characters)">
+        <input type="text" id="companyId" placeholder="Company ID (e.g., warehouse1)">
+        <button id="signup-button">Sign Up</button>
+        <p id="error-message"></p>
+        <div class="login-link">
+            <p>Already have an account? <a href="admin_login.html">Log In</a></p>
+        </div>
+    </div>
+    <script>
+        let _supabase;
+
+        async function initializeSupabase() {
+            try {
+                const supabaseUrl = "https://jqppakaodpgbtxzpvsti.supabase.co";
+                const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxcHBha2FvZHBnYnR4enB2c3RpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExMDIxOTEsImV4cCI6MjA4NjY3ODE5MX0.ksc0lzbjlMxC942dkSBSwJHpnwTjcyFV4ZX91LFtijk";
+                _supabase = supabase.createClient(supabaseUrl, supabaseAnonKey);
+            } catch (error) {
+                document.getElementById('error-message').textContent = "Error: Could not connect to the server.";
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeSupabase();
+
+            document.getElementById('signup-button').addEventListener('click', async () => {
+                if (!_supabase) {
+                    document.getElementById('error-message').textContent = "Connecting to server... please wait.";
+                    return;
+                }
+
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                const companyId = document.getElementById('companyId').value.trim();
+                const errorEl = document.getElementById('error-message');
+
+                if (!email || !password || !companyId) {
+                    errorEl.textContent = "Email, Password, and Company ID are required.";
+                    return;
+                }
+                if (password.length < 6) {
+                    errorEl.textContent = "Password must be at least 6 characters.";
+                    return;
+                }
+
+                errorEl.textContent = "Signing up...";
+
+                const { data, error } = await _supabase.auth.signUp({
+                    email: email,
+                    password: password
+                });
+
+                if (error) {
+                    errorEl.textContent = error.message;
+                    return;
+                }
+
+                if (data && data.user) {
+                    // Manually create the client profile
+                    const { error: clientError } = await _supabase.from('clients').insert([
+                        { admin_id: data.user.id, name: companyId, company_id: companyId }
+                    ]);
+
+                    if (clientError) {
+                        // If client creation fails, it's good practice to try and delete the created user
+                        // to avoid orphaned users. This is a best-effort operation.
+                        await _supabase.functions.invoke('delete-user', {
+                            body: { userId: data.user.id },
+                        });
+                        errorEl.textContent = "Signup failed: Could not create company profile. " + clientError.message;
+                        return;
+                    }
+                    
+                    errorEl.textContent = "Signup successful! Please check your email to confirm your account. Redirecting to login...";
+                    setTimeout(() => window.location.href = 'admin_login.html', 3000);
+
+                } else {
+                     errorEl.textContent = "An unknown error occurred during signup.";
+                }
+            });
+        });
+    </script>
+</body>
+</html>

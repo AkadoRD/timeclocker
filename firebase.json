@@ -1,0 +1,17 @@
+{
+  "hosting": {
+    "site": "app-72415",
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "package.json",
+      "package-lock.json",
+      "**/.*",
+      "**/node_modules/**",
+      "supabase/**",
+      "get-docker.sh",
+      "plan.txt",
+      "*.tar.gz"
+    ]
+  }
+}

@@ -1,0 +1,26 @@
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 20px; background-color: #f8f9fa; color: #333; }
+#app-container { max-width: 1200px; margin: 0 auto; }
+.panel { background: white; padding: 25px; border-radius: 16px; box-shadow: 0 8px 30px rgba(0,0,0,0.07); display: none; margin-top: 20px; }
+.panel.active { display: block; }
+button { background-color: #2cb3ba; color: white; border: none; padding: 12px 18px; border-radius: 10px; cursor: pointer; font-size: 1rem; font-weight: 500; margin: 5px; transition: background-color: 0.2s; }
+button:hover { background-color: #259399; }
+button.secondary { background-color: #7f8c8d; }
+button.secondary:hover { background-color: #6c7a7d; }
+button:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ecf0f1; }
+th { background-color: #f8f9fa; font-weight: 600; }
+h2, h3 { color: #2f3640; border-bottom: 2px solid #2cb3ba; padding-bottom: 10px; margin-top: 0; }
+#main-nav { display: flex; flex-wrap: wrap; justify-content: center; background: #fff; padding: 10px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; }
+#main-nav button.active { background-color: #259399; }
+input, select { padding: 10px; border-radius: 8px; border: 1px solid #ccc; margin-right: 10px; margin-bottom: 10px; }
+.logout-btn { position: absolute; top: 20px; right: 20px; }
+form { margin-bottom: 20px; padding: 15px; background: #fdfdfd; border-radius: 10px; border: 1px solid #eee;}
+#report-results table { margin-top: 10px; }
+
+/* Notification (Toast) Styles */
+#notification-container { position: fixed; bottom: 20px; right: 20px; z-index: 1000; }
+.toast { background-color: #333; color: #fff; padding: 15px 20px; border-radius: 8px; margin-top: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); opacity: 0; transition: opacity 0.3s, transform 0.3s; transform: translateY(20px); }
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast.success { background-color: #27ae60; }
+.toast.error { background-color: #c0392b; }
