@@ -4,16 +4,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const empIdInput = document.getElementById('empId');
     const clockInButton = document.querySelector('.clock-in');
     const clockOutButton = document.querySelector('.clock-out');
-    const msgEl = document.getElementById('msg');
     const dateEl = document.getElementById('date');
     const clockEl = document.getElementById('clock');
     const modal = document.getElementById('selectionModal');
     const selectionList = document.getElementById('employee-selection-list');
     const cancelSelectionButton = document.querySelector('.modal-content .secondary');
+    const statusIndicator = document.getElementById('status-indicator');
+    const lastActivity = document.getElementById('last-activity');
 
     // --- State ---
     let _supabase;
     let pendingActionType = null;
+    let statusCheckTimeout = null;
     const SUPABASE_URL = 'https://jqppakaodpgbtxzpvsti.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxcHBha2FvZHBnYnR4enB2c3RpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExMDIxOTEsImV4cCI6MjA4NjY3ODE5MX0.ksc0lzbjlMxC942dkSBSwJHpnwTjcyFV4ZX91LFtijk';
 
@@ -31,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => container.removeChild(toast), 300);
         }, duration);
     }
-    
+
     // --- Initialization ---
     async function initializeApp() {
         try {
@@ -52,7 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
         syncOfflineActions();
     });
 
-    // --- Clock Update ---
+    // --- Clock and UI Update ---
     function updateClock() {
         const now = new Date();
         const timeZone = "America/New_York";
@@ -60,7 +62,25 @@ document.addEventListener('DOMContentLoaded', () => {
         dateEl.innerText = now.toLocaleDateString("en-US", { timeZone, weekday: "long", month: "long", day: "numeric" });
     }
 
-    // --- UI Management ---
+    function updateStatusUI(statusInfo) {
+        if (!statusInfo || !statusInfo.status) {
+            statusIndicator.className = 'status-out';
+            statusIndicator.textContent = 'Clocked Out';
+            lastActivity.textContent = 'Enter your ID to see your status';
+            return;
+        }
+
+        if (statusInfo.status === 'in') {
+            statusIndicator.className = 'status-in';
+            statusIndicator.textContent = 'Clocked In';
+            lastActivity.textContent = `At ${statusInfo.clientName} since ${new Date(statusInfo.timestamp).toLocaleTimeString()}`;
+        } else { // 'out'
+            statusIndicator.className = 'status-out';
+            statusIndicator.textContent = 'Clocked Out';
+            lastActivity.textContent = `Last activity: ${new Date(statusInfo.timestamp).toLocaleTimeString()}`;
+        }
+    }
+
     function setMainButtonsDisabled(disabled) {
         clockInButton.disabled = disabled;
         clockOutButton.disabled = disabled;
@@ -68,6 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function resetUI() {
         empIdInput.value = "";
+        updateStatusUI(null); // Reset status display
         setMainButtonsDisabled(false);
     }
 
@@ -75,7 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.style.display = 'none';
         resetUI();
     }
-    
+
     // --- Geolocation ---
     async function getDeviceLocation() {
         if (!navigator.geolocation) return null;
@@ -100,27 +121,58 @@ document.addEventListener('DOMContentLoaded', () => {
     async function getEmployeeRecords(publicEmpId) {
         if (!navigator.onLine) {
             const cachedEmployees = getEmployeeRecordsFromCache(publicEmpId);
-            if (cachedEmployees) {
-                return { employees: cachedEmployees, error: null };
-            }
-            return { employees: null, error: { message: 'Offline and no data in cache.' } };
+            return cachedEmployees ? { employees: cachedEmployees, error: null } : { employees: null, error: { message: 'Offline and no data in cache.' } };
         }
 
-        const { data, error } = await _supabase
-            .from('employees')
-            .select(`id, name, active, employee_id, client_id, client:clients(name)`)
-            .eq('employee_id', publicEmpId);
-
+        const { data, error } = await _supabase.from('employees').select(`id, name, active, employee_id, client_id, client:clients(name)`).eq('employee_id', publicEmpId);
         if (error) {
             console.error("getEmployeeRecords error:", error);
             showToast('A database error occurred.', 'error');
             return { employees: null, error };
         }
-        
-        // Cache the successful lookup
         localStorage.setItem(`employee_cache_${publicEmpId}`, JSON.stringify(data));
-
         return { employees: data, error: null };
+    }
+
+    async function fetchAndDisplayStatus(publicEmpId) {
+        if (publicEmpId.length !== 4) {
+            updateStatusUI(null); // Reset if ID is not fully entered
+            return;
+        }
+
+        if (!navigator.onLine) {
+            lastActivity.textContent = "Status check unavailable offline.";
+            return;
+        }
+
+        lastActivity.textContent = "Checking status...";
+        
+        const { data: latestEntry, error } = await _supabase
+            .from('time_entries')
+            .select(`*, client:clients(name)`)
+            .eq('employee_id', publicEmpId)
+            .order('clock_in', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (error) {
+            console.error('Status check error:', error);
+            lastActivity.textContent = "Could not check status.";
+            return;
+        }
+        
+        if (latestEntry) {
+            const status = latestEntry.clock_out === null ? 'in' : 'out';
+            const clientName = latestEntry.client ? latestEntry.client.name : 'Unknown Client';
+            updateStatusUI({
+                status: status,
+                timestamp: status === 'in' ? latestEntry.clock_in : latestEntry.clock_out,
+                clientName: clientName
+            });
+        } else {
+            updateStatusUI({ status: 'out', timestamp: new Date(), clientName: 'N/A' }); // Assume 'out' for new employees
+            lastActivity.textContent = "No previous activity found.";
+        }
     }
 
     async function handleClockAction(actionType) {
@@ -136,9 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const { employees, error } = await getEmployeeRecords(empId);
         
         if (error || !employees) {
-            if (!navigator.onLine) {
-                showToast('Offline: This ID must be used online once before offline use.', 'error');
-            }
+            if (!navigator.onLine) showToast('Offline: This ID must be used online once before offline use.', 'error');
             setMainButtonsDisabled(false);
             return;
         }
@@ -159,7 +209,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (activeEmployees.length === 1) {
             await performClockAction(actionType, activeEmployees[0]);
         } else {
-            // Multiple active employees found
             if (!navigator.onLine) {
                 showToast('This ID has multiple profiles and cannot be used offline. Please connect to the internet.', 'error', 6000);
                 setMainButtonsDisabled(false);
@@ -201,44 +250,38 @@ document.addEventListener('DOMContentLoaded', () => {
             const location = isSyncing ? null : await getDeviceLocation();
 
             if (actionType === 'clock_in') {
-                const { data: openEntry } = await _supabase.from("time_entries")
-                    .select("id").eq("employee_id", publicEmpId).eq("client_id", clientId).is("clock_out", null)
-                    .maybeSingle();
-                
+                const { data: openEntry } = await _supabase.from("time_entries").select("id").eq("employee_id", publicEmpId).eq("client_id", clientId).is("clock_out", null).maybeSingle();
                 if (openEntry) {
                     if (!isSyncing) showToast("You are already clocked in.", 'error');
                     setMainButtonsDisabled(false);
                     return { success: false, error: 'Already clocked in' };
                 }
-
-                const { error } = await _supabase.from("time_entries").insert([{
-                    employee_id: publicEmpId,
-                    clock_in: now,
-                    client_id: clientId,
-                    location: location ? JSON.stringify(location) : null
-                }]);
+                const { error } = await _supabase.from("time_entries").insert([{ employee_id: publicEmpId, clock_in: now, client_id: clientId, location: location ? JSON.stringify(location) : null }]);
                 if (error) throw error;
                 if (!isSyncing) showToast("Clocked In!", 'success');
 
             } else if (actionType === 'clock_out') {
-                const { data: openEntry, error: findError } = await _supabase.from("time_entries")
-                    .select("id").eq("employee_id", publicEmpId).eq("client_id", clientId).is("clock_out", null)
-                    .maybeSingle();
-
+                const { data: openEntry, error: findError } = await _supabase.from("time_entries").select("id").eq("employee_id", publicEmpId).eq("client_id", clientId).is("clock_out", null).maybeSingle();
                 if (findError) throw findError;
                 if (!openEntry) {
                     if (!isSyncing) showToast("No active clock-in found.", 'error');
                     setMainButtonsDisabled(false);
                     return { success: false, error: 'No active clock-in' };
                 }
-                
                 const { error } = await _supabase.from("time_entries").update({ clock_out: now, location: location ? JSON.stringify(location) : null }).eq("id", openEntry.id);
                 if (error) throw error;
                 if (!isSyncing) showToast("Clocked Out!", 'success');
             }
 
-            if (!isSyncing) setTimeout(resetUI, 2000);
-            return { success: true };
+            if (!isSyncing) {
+                 // After a successful action, refresh the status and reset the main input
+                await fetchAndDisplayStatus(publicEmpId);
+                setTimeout(() => { // Keep status visible for a moment before clearing input
+                     empIdInput.value = "";
+                }, 2000);
+            } else { // for sync, just return success
+                 return { success: true };
+            }
 
         } catch (error) {
             if (error.message === 'offline' || !navigator.onLine) {
@@ -273,38 +316,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function syncOfflineActions() {
         if (!_supabase || !navigator.onLine) return;
-        
-        let pendingActions;
-        try {
-            pendingActions = JSON.parse(localStorage.getItem("pendingActions")) || [];
-        } catch (e) {
-            console.error("Could not parse pending actions, clearing:", e);
-            localStorage.setItem("pendingActions", "[]");
-            return;
-        }
-
+        let pendingActions = JSON.parse(localStorage.getItem("pendingActions")) || [];
         if (pendingActions.length === 0) return;
         
         showToast(`Syncing ${pendingActions.length} offline action(s)...`);
         
         const remainingActions = [];
         for (const action of pendingActions) {
-            if (!action || !action.type || !action.public_employee_id || !action.timestamp || action.client_id === null || action.client_id === undefined) {
+            if (!action || !action.type || !action.public_employee_id || !action.timestamp || action.client_id === null) {
                 console.error("Skipping invalid pending action:", action);
-                remainingActions.push(action); // Keep it for manual inspection if needed
                 continue; 
             }
-
             try {
-                // We have the client_id, so we can construct the exact employee object for performClockAction
-                const employeeToSync = {
-                    employee_id: action.public_employee_id,
-                    client_id: action.client_id
-                };
-
+                const employeeToSync = { employee_id: action.public_employee_id, client_id: action.client_id };
                 const result = await performClockAction(action.type, employeeToSync, true, action.timestamp);
-                
-                // Only retry if it was a sync/network error, not a logical one like "already clocked in"
                 if (!result.success && result.error !== 'Already clocked in' && result.error !== 'No active clock-in') {
                     remainingActions.push(action);
                 }
@@ -327,6 +352,13 @@ document.addEventListener('DOMContentLoaded', () => {
     clockInButton.addEventListener('click', () => handleClockAction('clock_in'));
     clockOutButton.addEventListener('click', () => handleClockAction('clock_out'));
     cancelSelectionButton.addEventListener('click', cancelSelection);
+    empIdInput.addEventListener('input', () => {
+        clearTimeout(statusCheckTimeout);
+        statusCheckTimeout = setTimeout(() => {
+            const empId = empIdInput.value.trim();
+            fetchAndDisplayStatus(empId);
+        }, 500); // Debounce: wait 500ms after user stops typing
+    });
     
     // --- Initial Run ---
     initializeApp();

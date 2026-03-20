@@ -20,6 +20,13 @@
       <div id="date">Loading...</div>
       <div id="clock">--:-- --</div>
     </div>
+
+    <!-- NEW: Status Display -->
+    <div id="status-container">
+      <div id="status-indicator" class="status-out">Clocked Out</div>
+      <div id="last-activity">Enter your ID to see your status</div>
+    </div>
+
     <div class="input-group">
       <label for="empId">Employee ID</label>
       <input id="empId" type="number" placeholder="0000" oninput="if(this.value.length > 4) this.value = this.value.slice(0,4);">
