@@ -1,6 +1,18 @@
+/**
+ * Main application logic for the Employee Time Clock.
+ * Handles:
+ * - UI interactions and updates.
+ * - Real-time employee status checks.
+ * - Clock-in and clock-out actions.
+ * - Multi-profile employee selection.
+ * - Offline action caching and synchronization.
+ */
 
 document.addEventListener('DOMContentLoaded', () => {
-    // --- DOM Elements ---
+
+    // --- CORE APP SETUP ---
+    // Immutable DOM elements and global state variables.
+
     const empIdInput = document.getElementById('empId');
     const clockInButton = document.querySelector('.clock-in');
     const clockOutButton = document.querySelector('.clock-out');
@@ -12,14 +24,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusIndicator = document.getElementById('status-indicator');
     const lastActivity = document.getElementById('last-activity');
 
-    // --- State ---
     let _supabase;
     let pendingActionType = null;
     let statusCheckTimeout = null;
     const SUPABASE_URL = 'https://jqppakaodpgbtxzpvsti.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxcHBha2FvZHBnYnR4enB2c3RpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExMDIxOTEsImV4cCI6MjA4NjY3ODE5MX0.ksc0lzbjlMxC942dkSBSwJHpnwTjcyFV4ZX91LFtijk';
 
-    // --- Toast Notification Function ---
+
+    // --- UI & DISPLAY LOGIC ---
+    // Functions dedicated to updating the user interface.
+
+    /**
+     * Displays a non-intrusive toast notification.
+     * @param {string} message The message to display.
+     * @param {string} [type='success'] 'success' or 'error'.
+     * @param {number} [duration=4000] How long to display the message.
+     */
     function showToast(message, type = 'success', duration = 4000) {
         const container = document.getElementById('notification-container');
         if (!container) return;
@@ -34,34 +54,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }, duration);
     }
 
-    // --- Initialization ---
-    async function initializeApp() {
-        try {
-            _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-            syncOfflineActions();
-        } catch (error) {
-            console.error('Failed to initialize Supabase:', error);
-            showToast("Error: Could not connect to the server.", 'error');
-        }
-    }
-
-    // --- Service Worker and Offline Sync ---
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));
-    }
-    window.addEventListener('online', () => {
-        showToast('You are back online. Syncing...', 'success');
-        syncOfflineActions();
-    });
-
-    // --- Clock and UI Update ---
+    /**
+     * Updates the live clock and date display.
+     */
     function updateClock() {
         const now = new Date();
-        const timeZone = "America/New_York";
+        const timeZone = "America/New_York"; 
         clockEl.innerText = now.toLocaleTimeString("en-US", { timeZone, hour: "2-digit", minute: "2-digit", hour12: true });
         dateEl.innerText = now.toLocaleDateString("en-US", { timeZone, weekday: "long", month: "long", day: "numeric" });
     }
 
+    /**
+     * Updates the status indicator based on the employee's clock-in status.
+     * @param {object|null} statusInfo - Information about the employee's status.
+     * @param {string} statusInfo.status - 'in' or 'out'.
+     * @param {string} statusInfo.timestamp - The ISO timestamp of the last event.
+     * @param {string} statusInfo.clientName - The name of the client associated with the event.
+     */
     function updateStatusUI(statusInfo) {
         if (!statusInfo || !statusInfo.status) {
             statusIndicator.className = 'status-out';
@@ -81,43 +90,72 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function setMainButtonsDisabled(disabled) {
-        clockInButton.disabled = disabled;
-        clockOutButton.disabled = disabled;
-    }
-
+    /**
+     * Resets the main UI to its initial state.
+     */
     function resetUI() {
         empIdInput.value = "";
         updateStatusUI(null); // Reset status display
         setMainButtonsDisabled(false);
     }
 
+    /**
+     * Disables or enables the main clock-in/out buttons.
+     * @param {boolean} disabled - True to disable, false to enable.
+     */
+    function setMainButtonsDisabled(disabled) {
+        clockInButton.disabled = disabled;
+        clockOutButton.disabled = disabled;
+    }
+
+    /**
+     * Displays the modal for selecting between multiple employee profiles.
+     * @param {Array<object>} employees - The list of active employee profiles.
+     * @param {string} actionType - 'clock_in' or 'clock_out'.
+     */
+    function showEmployeeSelection(employees, actionType) {
+        pendingActionType = actionType;
+        selectionList.innerHTML = '';
+        employees.forEach(employee => {
+            const btn = document.createElement('button');
+            const clientName = employee.client ? employee.client.name : 'Unknown Client';
+            btn.innerHTML = `${employee.name} <span>at ${clientName}</span>`;
+            btn.onclick = () => selectEmployee(employee);
+            selectionList.appendChild(btn);
+        });
+        modal.style.display = 'flex';
+    }
+    
+    /**
+     * Cancels the multi-profile selection and resets the UI.
+     */
     function cancelSelection() {
         modal.style.display = 'none';
         resetUI();
     }
 
-    // --- Geolocation ---
-    async function getDeviceLocation() {
-        if (!navigator.geolocation) return null;
+
+    // --- DATABASE & CACHE ---
+    // Functions for interacting with Supabase and the local browser cache.
+
+    /**
+     * Initializes the Supabase client.
+     */
+    async function initializeApp() {
         try {
-            const position = await new Promise((res, rej) => {
-                navigator.geolocation.getCurrentPosition(res, rej, { timeout: 5000, enableHighAccuracy: true });
-            });
-            return { latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy };
-        } catch (geoError) {
-            console.warn("Could not get location:", geoError.message);
-            showToast(`Could not get location: ${geoError.message}`, 'error');
-            return null;
+            _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        } catch (error) {
+            console.error('Failed to initialize Supabase:', error);
+            showToast("Error: Could not connect to the server.", 'error');
         }
     }
 
-    // --- Cache and Database Interaction ---
-    function getEmployeeRecordsFromCache(publicEmpId) {
-        const cached = localStorage.getItem(`employee_cache_${publicEmpId}`);
-        return cached ? JSON.parse(cached) : null;
-    }
-
+    /**
+     * Retrieves employee records, using online DB first, then falling back to cache.
+     * Caches the results on successful online lookup.
+     * @param {string} publicEmpId - The 4-digit employee ID.
+     * @returns {Promise<{employees: Array|null, error: object|null}>}
+     */
     async function getEmployeeRecords(publicEmpId) {
         if (!navigator.onLine) {
             const cachedEmployees = getEmployeeRecordsFromCache(publicEmpId);
@@ -125,15 +163,33 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const { data, error } = await _supabase.from('employees').select(`id, name, active, employee_id, client_id, client:clients(name)`).eq('employee_id', publicEmpId);
+        
         if (error) {
             console.error("getEmployeeRecords error:", error);
             showToast('A database error occurred.', 'error');
             return { employees: null, error };
         }
+        
+        // On successful lookup, cache the data for offline use.
         localStorage.setItem(`employee_cache_${publicEmpId}`, JSON.stringify(data));
         return { employees: data, error: null };
     }
 
+    /**
+     * Retrieves employee data from the browser's localStorage.
+     * @param {string} publicEmpId - The 4-digit employee ID.
+     * @returns {Array|null} The cached employee data.
+     */
+    function getEmployeeRecordsFromCache(publicEmpId) {
+        const cached = localStorage.getItem(`employee_cache_${publicEmpId}`);
+        return cached ? JSON.parse(cached) : null;
+    }
+
+    /**
+     * Fetches the last time entry for an employee ID to determine their current status.
+     * Updates the UI with this information.
+     * @param {string} publicEmpId - The 4-digit employee ID.
+     */
     async function fetchAndDisplayStatus(publicEmpId) {
         if (publicEmpId.length !== 4) {
             updateStatusUI(null); // Reset if ID is not fully entered
@@ -170,11 +226,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 clientName: clientName
             });
         } else {
-            updateStatusUI({ status: 'out', timestamp: new Date(), clientName: 'N/A' }); // Assume 'out' for new employees
+            // For brand new employees, assume they are clocked out.
+            updateStatusUI({ status: 'out', timestamp: new Date(), clientName: 'N/A' }); 
             lastActivity.textContent = "No previous activity found.";
         }
     }
 
+
+    // --- CORE CLOCKING LOGIC ---
+    // The main business logic for handling clock-in and clock-out events.
+
+    /**
+     * Orchestrates the clocking action, from fetching employee data to handling multiple profiles.
+     * @param {string} actionType - 'clock_in' or 'clock_out'.
+     */
     async function handleClockAction(actionType) {
         const empId = empIdInput.value.trim();
         if (!empId) {
@@ -209,8 +274,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (activeEmployees.length === 1) {
             await performClockAction(actionType, activeEmployees[0]);
         } else {
+            // If offline with multiple profiles, user action is required.
             if (!navigator.onLine) {
-                showToast('This ID has multiple profiles and cannot be used offline. Please connect to the internet.', 'error', 6000);
+                showToast('This ID has multiple profiles and requires an internet connection to select one.', 'error', 6000);
                 setMainButtonsDisabled(false);
                 return;
             }
@@ -218,19 +284,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function showEmployeeSelection(employees, actionType) {
-        pendingActionType = actionType;
-        selectionList.innerHTML = '';
-        employees.forEach(employee => {
-            const btn = document.createElement('button');
-            const clientName = employee.client ? employee.client.name : 'Unknown Client';
-            btn.innerHTML = `${employee.name} <span>at ${clientName}</span>`;
-            btn.onclick = () => selectEmployee(employee);
-            selectionList.appendChild(btn);
-        });
-        modal.style.display = 'flex';
-    }
-
+    /**
+     * Handles the user's selection from the multi-profile modal.
+     * @param {object} employee - The employee profile selected by the user.
+     */
     async function selectEmployee(employee) {
         modal.style.display = 'none';
         if (pendingActionType) {
@@ -240,13 +297,24 @@ document.addEventListener('DOMContentLoaded', () => {
         pendingActionType = null;
     }
 
+    /**
+     * Executes the final clock-in or clock-out database operation.
+     * Also handles logic for offline action saving.
+     * @param {string} actionType - 'clock_in' or 'clock_out'.
+     * @param {object} employee - The specific employee profile to use.
+     * @param {boolean} [isSyncing=false] - True if this action is part of an offline sync.
+     * @param {string|null} [syncTimestamp=null] - The original timestamp for a sync action.
+     * @returns {Promise<{success: boolean, error: string|null}>}
+     */
     async function performClockAction(actionType, employee, isSyncing = false, syncTimestamp = null) {
         const now = syncTimestamp || new Date().toISOString();
         const publicEmpId = employee.employee_id;
         const clientId = employee.client_id;
         
         try {
+            // If we are not syncing, and we are offline, throw to trigger offline save.
             if (!navigator.onLine && !isSyncing) throw new Error('offline');
+            
             const location = isSyncing ? null : await getDeviceLocation();
 
             if (actionType === 'clock_in') {
@@ -274,14 +342,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (!isSyncing) {
-                 // After a successful action, refresh the status and reset the main input
-                await fetchAndDisplayStatus(publicEmpId);
-                setTimeout(() => { // Keep status visible for a moment before clearing input
-                     empIdInput.value = "";
-                }, 2000);
-            } else { // for sync, just return success
-                 return { success: true };
+                await fetchAndDisplayStatus(publicEmpId); // Refresh status UI
+                // Keep status visible for a moment before clearing input
+                setTimeout(() => empIdInput.value = "", 2000);
             }
+            return { success: true };
 
         } catch (error) {
             if (error.message === 'offline' || !navigator.onLine) {
@@ -302,7 +367,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Offline Action Handling ---
+    /**
+     * Attempts to get the user's current geolocation coordinates.
+     * @returns {Promise<object|null>} The location object or null.
+     */
+    async function getDeviceLocation() {
+        if (!navigator.geolocation) return null;
+        try {
+            const position = await new Promise((res, rej) => {
+                navigator.geolocation.getCurrentPosition(res, rej, { timeout: 5000, enableHighAccuracy: true });
+            });
+            return { latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy };
+        } catch (geoError) {
+            console.warn("Could not get location:", geoError.message);
+            showToast(`Could not get location: ${geoError.message}`, 'error');
+            return null;
+        }
+    }
+
+
+    // --- OFFLINE HANDLING ---
+    // Functions for saving actions while offline and syncing when reconnected.
+
+    /**
+     * Saves a clocking action to localStorage to be synced later.
+     * @param {object} action - The action details to save.
+     */
     function saveOfflineAction(action) {
         try {
             let pending = JSON.parse(localStorage.getItem("pendingActions")) || [];
@@ -314,22 +404,37 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /**
+     * Processes and syncs actions that were saved while offline.
+     */
     async function syncOfflineActions() {
         if (!_supabase || !navigator.onLine) return;
-        let pendingActions = JSON.parse(localStorage.getItem("pendingActions")) || [];
+        
+        let pendingActions;
+        try {
+            pendingActions = JSON.parse(localStorage.getItem("pendingActions")) || [];
+        } catch (e) {
+            console.error("Could not parse pending actions, clearing:", e);
+            localStorage.setItem("pendingActions", "[]");
+            return;
+        }
+
         if (pendingActions.length === 0) return;
         
         showToast(`Syncing ${pendingActions.length} offline action(s)...`);
         
         const remainingActions = [];
         for (const action of pendingActions) {
-            if (!action || !action.type || !action.public_employee_id || !action.timestamp || action.client_id === null) {
+            // Basic validation for the stored action
+            if (!action || !action.type || !action.public_employee_id || !action.timestamp || action.client_id === null || action.client_id === undefined) {
                 console.error("Skipping invalid pending action:", action);
                 continue; 
             }
             try {
                 const employeeToSync = { employee_id: action.public_employee_id, client_id: action.client_id };
                 const result = await performClockAction(action.type, employeeToSync, true, action.timestamp);
+                
+                // If sync fails for a reason other than a logical conflict, keep it for retry.
                 if (!result.success && result.error !== 'Already clocked in' && result.error !== 'No active clock-in') {
                     remainingActions.push(action);
                 }
@@ -348,20 +453,43 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Event Listeners ---
+
+    // --- INITIALIZATION & EVENT LISTENERS ---
+    // Sets up the application, event listeners, and timers.
+
+    // Register service worker for PWA capabilities
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));
+    }
+    
+    // Listen for the browser coming back online
+    window.addEventListener('online', () => {
+        showToast('You are back online. Syncing...', 'success');
+        syncOfflineActions();
+    });
+    
+    // Main clocking buttons
     clockInButton.addEventListener('click', () => handleClockAction('clock_in'));
     clockOutButton.addEventListener('click', () => handleClockAction('clock_out'));
+    
+    // Modal cancel button
     cancelSelectionButton.addEventListener('click', cancelSelection);
+    
+    // Employee ID input with debounce for status checking
     empIdInput.addEventListener('input', () => {
         clearTimeout(statusCheckTimeout);
         statusCheckTimeout = setTimeout(() => {
             const empId = empIdInput.value.trim();
             fetchAndDisplayStatus(empId);
-        }, 500); // Debounce: wait 500ms after user stops typing
+        }, 500); // Wait 500ms after user stops typing
     });
     
-    // --- Initial Run ---
-    initializeApp();
+    // Initial application startup sequence
+    initializeApp().then(() => {
+        syncOfflineActions();
+    });
+
     updateClock();
     setInterval(updateClock, 1000);
+
 });
