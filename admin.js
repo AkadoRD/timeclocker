@@ -243,40 +243,59 @@ async function deleteClient(id) {
 
 function renderTimeEntries(entries) {
     const tableBody = document.querySelector('#time-entries-table tbody');
-    tableBody.innerHTML = '';
+    tableBody.innerHTML = ''; // Clear the table first
+
     entries.forEach(entry => {
+        const row = tableBody.insertRow();
+
         const employeeName = entry.employee ? entry.employee.name : 'Unknown';
         const clientName = (entry.employee && entry.employee.client) ? entry.employee.client.name : 'N/A';
 
-        let locationCell = '<td></td>';
+        row.insertCell().textContent = employeeName;
+        row.insertCell().textContent = clientName;
+        row.insertCell().textContent = new Date(entry.clock_in).toLocaleString();
+        row.insertCell().textContent = entry.clock_out ? new Date(entry.clock_out).toLocaleString() : 'Active';
+
+        // Location Cell
+        const locationCell = row.insertCell();
         if (entry.location) {
             try {
                 const loc = JSON.parse(entry.location);
                 if (loc.latitude && loc.longitude) {
-                    const mapsLink = `https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`;
-                    locationCell = `<td><a href="${mapsLink}" target="_blank" title="View on Google Maps">🗺️</a></td>`;
+                    const mapsLink = document.createElement('a');
+                    mapsLink.href = `https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`;
+                    mapsLink.target = '_blank';
+                    mapsLink.title = 'View on Google Maps';
+                    mapsLink.textContent = '🗺️';
+                    locationCell.appendChild(mapsLink);
                 }
-            } catch (e) { /* Location data is not valid JSON */ }
+            } catch (e) { /* Invalid JSON, do nothing */ }
         }
 
-        let actionButtons = `<button onclick="editTimeEntry(${entry.id})">Edit</button>`;
+        // Actions Cell
+        const actionsCell = row.insertCell();
+
+        // Edit Button
+        const editButton = document.createElement('button');
+        editButton.textContent = 'Edit';
+        editButton.addEventListener('click', () => editTimeEntry(entry.id));
+        actionsCell.appendChild(editButton);
+
+        // Clock Out Button (conditional)
         if (!entry.clock_out) {
-            actionButtons += `<button class="secondary" onclick="manualClockOut(${entry.id})">Clock Out</button>`;
+            const clockOutButton = document.createElement('button');
+            clockOutButton.textContent = 'Clock Out';
+            clockOutButton.className = 'secondary';
+            clockOutButton.addEventListener('click', () => manualClockOut(entry.id));
+            actionsCell.appendChild(clockOutButton);
         }
-        actionButtons += `<button class="secondary" onclick="deleteTimeEntry(${entry.id})">Delete</button>`;
 
-        tableBody.innerHTML += `
-            <tr>
-                <td>${employeeName}</td>
-                <td>${clientName}</td>
-                <td>${new Date(entry.clock_in).toLocaleString()}</td>
-                <td>${entry.clock_out ? new Date(entry.clock_out).toLocaleString() : 'Active'}</td>
-                ${locationCell}
-                <td>
-                    ${actionButtons}
-                </td>
-            </tr>
-        `;
+        // Delete Button
+        const deleteButton = document.createElement('button');
+        deleteButton.textContent = 'Delete';
+        deleteButton.className = 'secondary';
+        deleteButton.addEventListener('click', () => deleteTimeEntry(entry.id));
+        actionsCell.appendChild(deleteButton);
     });
 }
 
@@ -445,7 +464,7 @@ async function generateReport() {
             }
 
             tableHtml += `<tr><td>${employeeName}</td><td>${clientName}</td><td>${clockIn.toLocaleString()}</td><td>${clockOut ? clockOut.toLocaleString() : 'Active'}</td><td>${duration}</td><td>${locationHtml}</td></tr>`;
-            csvRows.push([`"${employeeName}"`, `"${clientName}"`, `"${clockIn.toISOString()}"`, `"${clockOut ? clockOut.toISOString() : ''}"`, `"${duration}"`, locationCsv].join(','));
+            csvRows.push([`"${employeeName}"`,`"${clientName}"`,`"${clockIn.toISOString()}"`,`"${clockOut ? clockOut.toISOString() : ''}"`,`"${duration}"`,locationCsv].join(','));
         }
 
         tableHtml += '</tbody></table>';
