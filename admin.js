@@ -96,38 +96,35 @@ function subscribeToTimeEntries() {
 // --- DATA FETCHING & RENDERING ---
 async function loadInitialData() {
     try {
-        const [clientsRes, employeesRes] = await Promise.all([
+        const [clientsRes, employeesRes, timeEntriesRes] = await Promise.all([
             _supabase.from('clients').select('id, name'),
-            _supabase.from('employees').select('*, client:clients(name)')
+            _supabase.from('employees').select('*, client:clients(name)'),
+            _supabase.from('time_entries').select('*, employee:employees(*, client:clients(name))').order('clock_in', { ascending: false }).limit(50)
         ]);
 
         if (clientsRes.error) throw clientsRes.error;
         if (employeesRes.error) throw employeesRes.error;
+        if (timeEntriesRes.error) throw timeEntriesRes.error;
 
         allClients = clientsRes.data;
         allEmployees = employeesRes.data;
         
-        await renderDashboardAndTables();
+        await renderDashboardAndTables(timeEntriesRes.data);
 
     } catch (error) {
         showToast('Error loading initial data: ' + error.message, 'error');
     }
 }
 
-async function renderDashboardAndTables() {
+async function renderDashboardAndTables(timeEntries) {
     const today = new Date();
     const sevenDaysAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    const [{ data: recentEntries, error: recentErr }, { data: weeklyEntries, error: weeklyErr }] = await Promise.all([
-        _supabase.from('time_entries').select('*, employee:employees(*, client:clients(name))').order('clock_in', { ascending: false }).limit(50),
-        _supabase.from('time_entries').select('employee_id, clock_in').gte('clock_in', sevenDaysAgo.toISOString())
-    ]);
-
-    if (recentErr) throw recentErr;
+    const { data: weeklyEntries, error: weeklyErr } = await _supabase.from('time_entries').select('employee_id, clock_in').gte('clock_in', sevenDaysAgo.toISOString());
     if (weeklyErr) throw weeklyErr;
 
-    renderDashboard(recentEntries, weeklyEntries);
-    renderAllManagementTables(recentEntries);
+    renderDashboard(timeEntries, weeklyEntries);
+    renderAllManagementTables(timeEntries);
 }
 
 function renderAllManagementTables(timeEntries) {
@@ -436,18 +433,26 @@ async function editTimeEntry(id) {
     const { data, error } = await _supabase.from('time_entries').select('*, employee:employees(*)').eq('id', id).single();
     if (error) return showToast('Could not fetch time entry data.', 'error');
 
-    const formatForInput = (date) => date ? new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : '';
+    const formatForInput = (date) => date ? new Date(new Date(date).getTime() - (new Date(date).getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : '';
 
     document.getElementById('time-entry-id-hidden').value = data.id;
-    
+
     const empSelect = document.getElementById('time-entry-employee');
-    const masterEmp = allEmployees.find(e => e.employee_id === data.employee.employee_id && e.client_id === data.client_id);
-    if(masterEmp) empSelect.value = masterEmp.id;
+    // Usamos el 'employee_id' que viene en el fichaje para encontrar al empleado en la lista principal.
+    const employeeToSelect = allEmployees.find(e => e.id === data.employee.id);
+    if (employeeToSelect) {
+        empSelect.value = employeeToSelect.id;
+    } else {
+        // Si no lo encuentra (algo raro), al menos no da un error y lo notifica.
+        console.error('Could not find matching employee in dropdown for id:', data.employee_id);
+        showToast('Could not pre-select employee in the form.', 'error');
+    }
 
     document.getElementById('time-entry-clock-in').value = formatForInput(new Date(data.clock_in));
     document.getElementById('time-entry-clock-out').value = formatForInput(data.clock_out ? new Date(data.clock_out) : null);
     document.getElementById('time-entries-panel').scrollIntoView();
 }
+
 
 async function deleteTimeEntry(id) {
     if (!confirm('Are you sure you want to delete this time entry?')) return;
