@@ -41,8 +41,8 @@ body {
 }
 
 .nav-button.active {
-    color: #007bff;
-    border-bottom-color: #007bff;
+    color: #17a2b8; /* Restored Teal */
+    border-bottom-color: #17a2b8; /* Restored Teal */
     font-weight: 500;
 }
 
@@ -78,19 +78,21 @@ input[type="text"], input[type="datetime-local"], input[type="date"], select {
     flex-grow: 1;
 }
 
+/* Buttons */
 button {
     padding: 8px 15px;
     border-radius: 4px;
-    border: 1px solid #007bff;
-    background-color: #007bff;
     color: white;
     cursor: pointer;
     font-size: 14px;
     transition: background-color 0.2s;
+    border: 1px solid #17a2b8; /* Restored Teal */
+    background-color: #17a2b8; /* Restored Teal */
 }
 
-button:hover {
-    background-color: #0056b3;
+button:not(.secondary):hover {
+    background-color: #138496; /* Darker Teal */
+    border-color: #138496;
 }
 
 button.secondary {
@@ -101,6 +103,7 @@ button.secondary {
 button.secondary:hover {
     background-color: #5a6268;
 }
+
 
 /* Tables */
 table {
@@ -203,7 +206,7 @@ td button {
 
 .chart-bar {
     width: 70%;
-    background-color: #007bff;
+    background-color: #17a2b8; /* Restored Teal */
     border-radius: 4px 4px 0 0;
     position: relative;
     transition: height 0.5s ease-out;
