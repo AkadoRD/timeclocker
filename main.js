@@ -36,7 +36,6 @@ document.addEventListener('DOMContentLoaded', () => {
     async function initializeApp() {
         try {
             _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-            // Attempt to sync any pending actions from when the app was offline
             syncOfflineActions();
         } catch (error) {
             console.error('Failed to initialize Supabase:', error);
@@ -79,21 +78,12 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // --- Geolocation ---
     async function getDeviceLocation() {
-        if (!navigator.geolocation) {
-            return null;
-        }
+        if (!navigator.geolocation) return null;
         try {
             const position = await new Promise((res, rej) => {
-                navigator.geolocation.getCurrentPosition(res, rej, {
-                    timeout: 5000,
-                    enableHighAccuracy: true
-                });
+                navigator.geolocation.getCurrentPosition(res, rej, { timeout: 5000, enableHighAccuracy: true });
             });
-            return {
-                latitude: position.coords.latitude,
-                longitude: position.coords.longitude,
-                accuracy: position.coords.accuracy,
-            };
+            return { latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy };
         } catch (geoError) {
             console.warn("Could not get location:", geoError.message);
             showToast(`Could not get location: ${geoError.message}`, 'error');
@@ -101,8 +91,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Core Logic: Database Interaction ---
+    // --- Cache and Database Interaction ---
+    function getEmployeeRecordsFromCache(publicEmpId) {
+        const cached = localStorage.getItem(`employee_cache_${publicEmpId}`);
+        return cached ? JSON.parse(cached) : null;
+    }
+
     async function getEmployeeRecords(publicEmpId) {
+        if (!navigator.onLine) {
+            const cachedEmployees = getEmployeeRecordsFromCache(publicEmpId);
+            if (cachedEmployees) {
+                return { employees: cachedEmployees, error: null };
+            }
+            return { employees: null, error: { message: 'Offline and no data in cache.' } };
+        }
+
         const { data, error } = await _supabase
             .from('employees')
             .select(`id, name, active, employee_id, client_id, client:clients(name)`)
@@ -111,9 +114,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (error) {
             console.error("getEmployeeRecords error:", error);
             showToast('A database error occurred.', 'error');
-            return { error };
+            return { employees: null, error };
         }
-        return { employees: data };
+        
+        // Cache the successful lookup
+        localStorage.setItem(`employee_cache_${publicEmpId}`, JSON.stringify(data));
+
+        return { employees: data, error: null };
     }
 
     async function handleClockAction(actionType) {
@@ -126,18 +133,14 @@ document.addEventListener('DOMContentLoaded', () => {
         setMainButtonsDisabled(true);
         showToast("Processing...");
 
-        // If offline, save action and exit
-        if (!navigator.onLine) {
-            showToast('You are offline. Action saved for later.', 'success');
-            saveOfflineAction({ type: actionType, public_employee_id: empId, timestamp: new Date().toISOString(), client_id: null });
-            setTimeout(resetUI, 3000);
-            return;
-        }
-
         const { employees, error } = await getEmployeeRecords(empId);
+        
         if (error || !employees) {
+            if (!navigator.onLine) {
+                showToast('Offline: This ID must be used online once before offline use.', 'error');
+            }
             setMainButtonsDisabled(false);
-            return; // Error toast is shown in getEmployeeRecords
+            return;
         }
 
         if (employees.length === 0) {
@@ -153,18 +156,22 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        // If only one employee matches, proceed directly. Otherwise, show selection modal.
         if (activeEmployees.length === 1) {
             await performClockAction(actionType, activeEmployees[0]);
         } else {
+            // Multiple active employees found
+            if (!navigator.onLine) {
+                showToast('This ID has multiple profiles and cannot be used offline. Please connect to the internet.', 'error', 6000);
+                setMainButtonsDisabled(false);
+                return;
+            }
             showEmployeeSelection(activeEmployees, actionType);
         }
     }
 
     function showEmployeeSelection(employees, actionType) {
         pendingActionType = actionType;
-        selectionList.innerHTML = ''; // Clear previous options
-
+        selectionList.innerHTML = '';
         employees.forEach(employee => {
             const btn = document.createElement('button');
             const clientName = employee.client ? employee.client.name : 'Unknown Client';
@@ -172,7 +179,6 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.onclick = () => selectEmployee(employee);
             selectionList.appendChild(btn);
         });
-
         modal.style.display = 'flex';
     }
 
@@ -192,7 +198,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         try {
             if (!navigator.onLine && !isSyncing) throw new Error('offline');
-
             const location = isSyncing ? null : await getDeviceLocation();
 
             if (actionType === 'clock_in') {
@@ -284,41 +289,28 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const remainingActions = [];
         for (const action of pendingActions) {
-            // Basic validation of the action object
-            if (!action || !action.type || !action.public_employee_id || !action.timestamp) {
+            if (!action || !action.type || !action.public_employee_id || !action.timestamp || action.client_id === null || action.client_id === undefined) {
                 console.error("Skipping invalid pending action:", action);
+                remainingActions.push(action); // Keep it for manual inspection if needed
                 continue; 
             }
 
             try {
-                const { employees, error } = await getEmployeeRecords(action.public_employee_id);
-                if (error || !employees || employees.length === 0) {
-                    remainingActions.push(action);
-                    continue;
-                }
+                // We have the client_id, so we can construct the exact employee object for performClockAction
+                const employeeToSync = {
+                    employee_id: action.public_employee_id,
+                    client_id: action.client_id
+                };
 
-                const activeEmployees = employees.filter(emp => emp.active);
-                let employeeToSync = null;
-
-                if (action.client_id !== null) {
-                    employeeToSync = activeEmployees.find(emp => emp.client_id === action.client_id);
-                } else if (activeEmployees.length === 1) {
-                    // If client_id wasn't specified and there's only one active profile, we can be confident.
-                    employeeToSync = activeEmployees[0];
-                }
-
-                if (employeeToSync) {
-                    const result = await performClockAction(action.type, employeeToSync, true, action.timestamp);
-                    if (!result.success && result.error !== 'Already clocked in' && result.error !== 'No active clock-in') {
-                        remainingActions.push(action); // Only retry if it was a sync/network error, not a logical one
-                    }
-                } else {
-                    // Could not determine a unique employee, so we must keep the action pending.
+                const result = await performClockAction(action.type, employeeToSync, true, action.timestamp);
+                
+                // Only retry if it was a sync/network error, not a logical one like "already clocked in"
+                if (!result.success && result.error !== 'Already clocked in' && result.error !== 'No active clock-in') {
                     remainingActions.push(action);
                 }
             } catch (syncError) {
                 console.error("Error processing a sync action:", syncError);
-                remainingActions.push(action); // Keep action for next time
+                remainingActions.push(action);
             }
         }
 
