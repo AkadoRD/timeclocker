@@ -450,7 +450,8 @@ async function generateReport() {
 
         tableHtml += '</tbody></table>';
         resultsContainer.innerHTML = tableHtml;
-        document.getElementById('download-csv-btn').dataset.csv = csvRows.join('\n');
+        document.getElementById('download-csv-btn').dataset.csv = csvRows.join('
+');
 
     } catch (err) {
         showToast(`Error generating report: ${err.message}`, 'error');
