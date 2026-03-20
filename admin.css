@@ -1,7 +1,7 @@
 /* General Body and Layout */
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background-color: #f0f2f5;
+    background-color: #f4f7fa;
     color: #333;
     margin: 0;
     padding: 20px;
@@ -9,82 +9,78 @@ body {
 
 #app-container {
     max-width: 1200px;
-    margin: 20px auto;
+    margin: 0 auto;
     background-color: #fff;
     border-radius: 8px;
-    padding: 25px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
 }
 
 .logout-btn {
     position: absolute;
-    top: 15px;
-    right: 15px;
+    top: 10px;
+    right: 10px;
 }
 
-/* Navigation - Button Style */
+/* Navigation */
 #main-nav {
     display: flex;
-    gap: 10px;
-    margin-bottom: 30px;
-    padding-bottom: 20px;
-    border-bottom: 1px solid #e9ecef;
+    border-bottom: 1px solid #dee2e6;
+    margin-bottom: 20px;
 }
 
 .nav-button {
-    padding: 10px 20px;
+    padding: 10px 15px;
     border: none;
-    border-radius: 6px;
-    background-color: #20c997; /* Correct Teal */
-    color: white;
+    background: none;
     cursor: pointer;
     font-size: 16px;
-    font-weight: 500;
-    transition: background-color 0.2s;
-}
-
-.nav-button:hover {
-    background-color: #1baa80; /* Darker Teal */
+    color: #495057;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px; /* Align with the container's border */
 }
 
 .nav-button.active {
-    background-color: #159a77; /* Even Darker for Active state */
-    box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+    color: #17a2b8; /* Restored Original Teal */
+    border-bottom-color: #17a2b8; /* Restored Original Teal */
+    font-weight: 500;
 }
 
-/* Panels and Headings */
-.panel {
-    display: none;
+.nav-button:hover {
+    background-color: #e9ecef;
 }
-.panel.active {
-    display: block;
-}
+
+/* Panels */
+.panel { display: none; }
+.panel.active { display: block; }
 
 .panel h2, .dashboard-section h3 {
     color: #343a40;
     padding-bottom: 10px;
     margin-top: 0;
     margin-bottom: 20px;
-    border-bottom: 2px solid #20c997; /* Correct Teal */
+    border-bottom: 2px solid #17a2b8; /* Restored Original Teal */
 }
 
 /* Forms and Inputs */
 form {
-    margin-bottom: 25px;
-    padding: 20px;
+    margin-bottom: 20px;
+    padding: 15px;
     background-color: #f8f9fa;
-    border-radius: 8px;
+    border-radius: 5px;
     display: flex;
-    gap: 15px;
+    gap: 10px;
     align-items: center;
+    flex-wrap: wrap;
 }
 
-input[type="text"], input[type="datetime-local"], input[type="date"], select {
-    padding: 10px 14px;
+input[type="text"], input[type="email"], input[type="password"], input[type="datetime-local"], input[type="date"], select {
+    padding: 8px 12px;
     border: 1px solid #ced4da;
-    border-radius: 6px;
+    border-radius: 4px;
     font-size: 14px;
     flex-grow: 1;
+    min-width: 150px;
 }
 
 /* General Button Styles */
@@ -100,11 +96,11 @@ button {
 }
 
 button:not(.secondary) {
-    background-color: #20c997; /* Correct Teal */
+    background-color: #17a2b8; /* Restored Original Teal */
 }
 
 button:not(.secondary):hover {
-    background-color: #1baa80; /* Darker Teal */
+    background-color: #138496; /* Darker Original Teal */
 }
 
 button.secondary {
@@ -124,13 +120,13 @@ table {
 }
 
 th, td {
-    padding: 14px 16px;
+    padding: 12px 15px;
     text-align: left;
-    border-bottom: 1px solid #e9ecef;
+    border-bottom: 1px solid #dee2e6;
 }
 
 thead th {
-    background-color: #f8f9fa;
+    background-color: #e9ecef;
     font-weight: 600;
 }
 
@@ -140,19 +136,15 @@ td button {
 
 /* Dashboard Specific Styles */
 .dashboard-section {
-    background-color: #fff;
+    background-color: #fdfdfd;
     border: 1px solid #e9ecef;
-    border-radius: 8px;
+    border-radius: 6px;
     padding: 20px;
-    margin-bottom: 25px;
+    margin-bottom: 20px;
 }
 
-.dashboard-list ul {
-    list-style: none; padding: 0; margin: 0;
-}
-.dashboard-list li {
-    display: flex; justify-content: space-between; padding: 10px 5px; border-bottom: 1px solid #f1f1f1;
-}
+.dashboard-list ul { list-style: none; padding: 0; margin: 0; }
+.dashboard-list li { display: flex; justify-content: space-between; padding: 8px 4px; border-bottom: 1px solid #f1f1f1; }
 .dashboard-list li:last-child { border-bottom: none; }
 
 .chart-container { height: 250px; width: 100%; }
@@ -160,14 +152,14 @@ td button {
 .chart-bar-group { flex: 1; display: flex; flex-direction: column; align-items: center; }
 
 .chart-bar {
-    width: 60%;
-    background-color: #20c997; /* Correct Teal */
-    border-radius: 5px 5px 0 0;
+    width: 70%;
+    background-color: #17a2b8; /* Restored Original Teal */
+    border-radius: 4px 4px 0 0;
     position: relative;
     transition: height 0.5s ease-out;
 }
-.chart-bar .bar-label { position: absolute; top: -22px; left: 50%; transform: translateX(-50%); font-weight: bold; color: #333; }
-.day-label { margin-top: 10px; font-size: 14px; font-weight: 500; color: #6c7d8e; }
+.chart-bar .bar-label { position: absolute; top: -20px; left: 50%; transform: translateX(-50%); font-weight: bold; color: #333; }
+.day-label { margin-top: 8px; font-size: 14px; font-weight: 500; color: #6c7d8e; }
 
 
 /* Toast Notifications */
