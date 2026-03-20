@@ -20,25 +20,19 @@
             <button class="nav-button" data-panel="employees-panel">Employees</button>
             <button class="nav-button" data-panel="clients-panel">Clients</button>
             <button class="nav-button" data-panel="time-entries-panel">Time Entries</button>
+            <button class="nav-button" data-panel="profile-panel">Profile</button>
         </div>
 
         <div id="dashboard-panel" class="panel active">
             <h2>Dashboard</h2>
-            
             <div class="dashboard-section">
                 <h3>Today's Activity</h3>
-                <div id="todays-activity-list" class="dashboard-list">
-                    <p>Loading...</p>
-                </div>
+                <div id="todays-activity-list" class="dashboard-list"><p>Loading...</p></div>
             </div>
-
             <div class="dashboard-section">
                 <h3>Weekly Attendance</h3>
-                <div id="weekly-attendance-chart" class="chart-container">
-                    <p>Loading...</p>
-                </div>
+                <div id="weekly-attendance-chart" class="chart-container"><p>Loading...</p></div>
             </div>
-
             <div class="dashboard-section">
                 <h3>Admin Tools</h3>
                 <button onclick="findDuplicateIds()">Find Duplicate Employee IDs</button>
@@ -48,13 +42,11 @@
 
         <div id="reports-panel" class="panel">
             <h2>Export Time Report</h2>
-            <div>
-                <label for="start-date">Start Date:</label>
-                <input type="date" id="start-date">
-                <label for="end-date">End Date:</label>
-                <input type="date" id="end-date">
-                <button onclick="generateReport()" id="generate-report-btn">Generate Report</button>
-            </div>
+            <form>
+                <input type="date" id="start-date" placeholder="Start Date">
+                <input type="date" id="end-date" placeholder="End Date">
+                <button type="button" onclick="generateReport()" id="generate-report-btn">Generate Report</button>
+            </form>
             <div id="report-results"></div>
         </div>
         
@@ -67,10 +59,7 @@
                 <select id="employee-client" required></select>
                 <button type="submit">Save Employee</button>
             </form>
-            <table id="employees-table">
-                <thead><tr><th>Name</th><th>ID</th><th>Client</th><th>Active</th><th>Actions</th></tr></thead>
-                <tbody></tbody>
-            </table>
+            <table id="employees-table"><thead><tr><th>Name</th><th>ID</th><th>Client</th><th>Active</th><th>Actions</th></tr></thead><tbody></tbody></table>
         </div>
         
         <div id="clients-panel" class="panel">
@@ -80,10 +69,7 @@
                 <input type="text" id="client-name" placeholder="Client Name" required>
                 <button type="submit">Save Client</button>
             </form>
-            <table id="clients-table">
-                <thead><tr><th>Name</th><th>Actions</th></tr></thead>
-                <tbody></tbody>
-            </table>
+            <table id="clients-table"><thead><tr><th>Name</th><th>Actions</th></tr></thead><tbody></tbody></table>
         </div>
 
         <div id="time-entries-panel" class="panel">
@@ -95,12 +81,19 @@
                 <input type="datetime-local" id="time-entry-clock-out">
                 <button type="submit">Save Entry</button>
             </form>
-
             <h2>Recent Time Entries</h2>
-            <table id="time-entries-table">
-                <thead><tr><th>Employee</th><th>Client</th><th>Clock In</th><th>Clock Out</th><th>Location</th><th>Actions</th></tr></thead>
-                <tbody></tbody>
-            </table>
+            <table id="time-entries-table"><thead><tr><th>Employee</th><th>Client</th><th>Clock In</th><th>Clock Out</th><th>Location</th><th>Actions</th></tr></thead><tbody></tbody></table>
+        </div>
+
+        <div id="profile-panel" class="panel">
+            <h2>Manage Profile</h2>
+            <form id="profile-form">
+                <input type="text" id="profile-name" placeholder="Your Name" required>
+                <input type="email" id="profile-email" placeholder="Your Login Email" disabled> <!-- Email is not updatable -->
+                <input type="password" id="profile-password" placeholder="New Password (leave blank to keep current)">
+                <input type="password" id="profile-password-confirm" placeholder="Confirm New Password">
+                <button type="submit">Update Profile</button>
+            </form>
         </div>
 
     </div>
