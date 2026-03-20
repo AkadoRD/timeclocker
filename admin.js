@@ -4,6 +4,7 @@ const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let allEmployees = [];
 let allClients = [];
+let timeEntriesListener = null;
 
 // --- Toast Notification Function ---
 function showToast(message, type = 'success', duration = 4000) {
@@ -28,9 +29,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
 _supabase.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+        if (timeEntriesListener) {
+            _supabase.removeChannel(timeEntriesListener);
+        }
         window.location.href = 'admin_login.html';
     }
 });
+
+function subscribeToTimeEntries() {
+    // Ensure we don't have duplicate listeners
+    if (timeEntriesListener) {
+        return;
+    }
+
+    timeEntriesListener = _supabase.channel('public:time_entries')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'time_entries' }, (payload) => {
+            console.log('Realtime change detected:', payload);
+            showToast('Activity detected. Refreshing data...', 'success');
+            loadInitialData();
+        })
+        .subscribe((status, err) => {
+            if (status === 'SUBSCRIBED') {
+                console.log('Successfully subscribed to real-time updates.');
+            } else if (err) {
+                console.error('Realtime subscription failed:', err);
+                showToast('Live update connection failed. Please refresh.', 'error');
+            }
+        });
+}
 
 async function checkSessionAndInitialize() {
     try {
@@ -42,6 +68,7 @@ async function checkSessionAndInitialize() {
 
         document.getElementById('app-container').style.display = 'block';
         await loadInitialData();
+        subscribeToTimeEntries(); // Start listening for real-time changes
 
         document.getElementById('logout-button').addEventListener('click', () => _supabase.auth.signOut());
 
