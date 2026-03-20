@@ -5,6 +5,7 @@
  * - Real-time monitoring of time entries.
  * - CRUD operations for Employees, Clients, and Time Entries.
  * - Reporting and data export.
+ * - Dashboard with daily and weekly summaries.
  */
 
 // --- GLOBAL STATE & SETUP ---
@@ -17,16 +18,11 @@ let allEmployees = [];
 let allClients = [];
 let timeEntriesListener = null;
 
-
 // --- AUTHENTICATION & INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
     checkSessionAndInitialize();
 });
 
-/**
- * Checks for an active user session and initializes the application.
- * Redirects to login page if no session is found.
- */
 async function checkSessionAndInitialize() {
     try {
         const { data: { session }, error } = await _supabase.auth.getSession();
@@ -35,12 +31,9 @@ async function checkSessionAndInitialize() {
             return;
         }
 
-        // Show the main app container and load all necessary data.
         document.getElementById('app-container').style.display = 'block';
         await loadInitialData();
-        subscribeToTimeEntries(); // Activate real-time functionality.
-
-        // Setup core event listeners for navigation and forms.
+        subscribeToTimeEntries();
         setupEventListeners();
 
     } catch (err) {
@@ -49,12 +42,8 @@ async function checkSessionAndInitialize() {
     }
 }
 
-/**
- * Listens for authentication state changes (e.g., sign out) and handles cleanup.
- */
 _supabase.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
-        // Clean up real-time listener before redirecting.
         if (timeEntriesListener) {
             _supabase.removeChannel(timeEntriesListener);
         }
@@ -62,15 +51,11 @@ _supabase.auth.onAuthStateChange((event, session) => {
     }
 });
 
-/**
- * Sets up all the main event listeners for the application.
- */
 function setupEventListeners() {
     document.getElementById('logout-button').addEventListener('click', () => _supabase.auth.signOut());
 
     document.querySelectorAll('.nav-button').forEach(button => {
         button.addEventListener('click', (e) => {
-            // Handle navigation between panels.
             document.querySelectorAll('.nav-button').forEach(btn => btn.classList.remove('active'));
             e.target.classList.add('active');
             document.querySelectorAll('.panel').forEach(panel => panel.classList.remove('active'));
@@ -78,20 +63,14 @@ function setupEventListeners() {
         });
     });
     
-    // Form submission listeners
     document.getElementById('employee-form').addEventListener('submit', saveEmployee);
     document.getElementById('client-form').addEventListener('submit', saveClient);
     document.getElementById('time-entry-form').addEventListener('submit', saveTimeEntry);
 }
 
-
 // --- REAL-TIME FUNCTIONALITY ---
-
-/**
- * Subscribes to changes in the 'time_entries' table and triggers a data reload.
- */
 function subscribeToTimeEntries() {
-    if (timeEntriesListener) return; // Prevent duplicate subscriptions.
+    if (timeEntriesListener) return;
 
     timeEntriesListener = _supabase.channel('public:time_entries')
         .on('postgres_changes', 
@@ -99,63 +78,138 @@ function subscribeToTimeEntries() {
             (payload) => {
                 console.log('Realtime change detected:', payload);
                 showToast('Activity detected. Refreshing data...', 'success');
-                loadInitialData(); // Reload all data to ensure consistency.
+                loadInitialData(); 
             }
         )
         .subscribe((status, err) => {
-            if (status === 'SUBSCRIBED') {
-                console.log('Successfully subscribed to real-time updates.');
-            } else if (err) {
-                console.error('Realtime subscription failed:', err);
-                showToast('Live update connection failed. Please refresh.', 'error');
-            }
+            if (status === 'SUBSCRIBED') console.log('Successfully subscribed to real-time updates.');
+            else if (err) console.error('Realtime subscription failed:', err);
         });
 }
 
-
-// --- DATA FETCHING ---
-
-/**
- * Fetches all initial data required for the admin panel from Supabase.
- */
+// --- DATA FETCHING & RENDERING ---
 async function loadInitialData() {
     try {
-        const [clientsRes, employeesRes, timeEntriesRes] = await Promise.all([
+        const [clientsRes, employeesRes] = await Promise.all([
             _supabase.from('clients').select('id, name'),
-            _supabase.from('employees').select('*, client:clients(name)'),
-            _supabase.from('time_entries').select('*, location, employee:employees(*, client:clients(name))').order('clock_in', { ascending: false }).limit(50)
+            _supabase.from('employees').select('*, client:clients(name)')
         ]);
 
         if (clientsRes.error) throw clientsRes.error;
         if (employeesRes.error) throw employeesRes.error;
-        if (timeEntriesRes.error) throw timeEntriesRes.error;
 
-        // Store data in global cache.
         allClients = clientsRes.data;
         allEmployees = employeesRes.data;
         
-        // Render all sections with the new data.
-        renderAllTables(timeEntriesRes.data);
+        // The main render call that now includes the new dashboard.
+        await renderDashboardAndTables();
 
     } catch (error) {
         showToast('Error loading initial data: ' + error.message, 'error');
     }
 }
 
+async function renderDashboardAndTables() {
+    // This function will now fetch time-sensitive data and render everything.
+    const today = new Date();
+    const sevenDaysAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-// --- UI RENDERING & DOM MANIPULATION ---
+    // Fetch data for dashboard and recent entries simultaneously.
+    const [{ data: recentEntries, error: recentErr }, { data: weeklyEntries, error: weeklyErr }] = await Promise.all([
+        _supabase.from('time_entries').select('*, employee:employees(*, client:clients(name))').order('clock_in', { ascending: false }).limit(50),
+        _supabase.from('time_entries').select('employee_id, clock_in').gte('clock_in', sevenDaysAgo.toISOString())
+    ]);
 
-/**
- * Main render function to update all data-driven UI components.
- * @param {Array} timeEntries - The latest time entries to display.
- */
-function renderAllTables(timeEntries) {
+    if (recentErr) throw recentErr;
+    if (weeklyErr) throw weeklyErr;
+
+    // Render all components with the fetched data.
+    renderDashboard(recentEntries, weeklyEntries);
+    renderAllManagementTables(recentEntries);
+}
+
+function renderAllManagementTables(timeEntries) {
     renderClients(allClients);
     populateClientDropdown(allClients);
     renderEmployees(allEmployees);
     populateEmployeeDropdown();
     renderTimeEntries(timeEntries);
 }
+
+// --- DASHBOARD SPECIFIC FUNCTIONS ---
+function renderDashboard(recentEntries, weeklyEntries) {
+    renderTodaysActivity(recentEntries);
+    renderWeeklyAttendance(weeklyEntries);
+}
+
+function renderTodaysActivity(entries) {
+    const list = document.getElementById('todays-activity-list');
+    const startOfDay = new Date().setHours(0, 0, 0, 0);
+
+    const todaysEntries = entries.filter(entry => new Date(entry.clock_in) >= startOfDay);
+
+    if (todaysEntries.length === 0) {
+        list.innerHTML = '<p>No employee activity recorded yet today.</p>';
+        return;
+    }
+
+    list.innerHTML = `
+        <div class="list-header">
+            <span>Employee</span>
+            <span>Status</span>
+        </div>
+        <ul>
+            ${todaysEntries.map(entry => {
+                const employeeName = entry.employee ? entry.employee.name : `ID: ${entry.employee_id}`;
+                const clientName = (entry.employee && entry.employee.client) ? entry.employee.client.name : 'N/A';
+                const status = entry.clock_out ? `Clocked out at ${new Date(entry.clock_out).toLocaleTimeString()}` : 'Clocked In';
+                return `<li><strong>${employeeName}</strong> (${clientName}) - <span>${status}</span></li>`;
+            }).join('')}
+        </ul>
+    `;
+}
+
+function renderWeeklyAttendance(entries) {
+    const chartContainer = document.getElementById('weekly-attendance-chart');
+    const attendance = {};
+    const today = new Date();
+
+    // Initialize last 7 days
+    for (let i = 6; i >= 0; i--) {
+        const date = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
+        const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+        attendance[dayName] = new Set(); // Use a Set to count unique employees
+    }
+
+    // Process entries
+    entries.forEach(entry => {
+        const entryDate = new Date(entry.clock_in);
+        const dayName = entryDate.toLocaleDateString('en-US', { weekday: 'short' });
+        if (attendance.hasOwnProperty(dayName)) {
+            attendance[dayName].add(entry.employee_id);
+        }
+    });
+
+    const maxAttendance = Math.max(...Object.values(attendance).map(s => s.size), 1); // Avoid division by zero
+
+    let chartHtml = '<div class="chart-bars">';
+    for (const day in attendance) {
+        const count = attendance[day].size;
+        const barHeight = (count / maxAttendance) * 100;
+        chartHtml += `
+            <div class="chart-bar-group">
+                <div class="chart-bar" style="height: ${barHeight}%;">
+                    <span class="bar-label">${count}</span>
+                </div>
+                <div class="day-label">${day}</div>
+            </div>
+        `;
+    }
+    chartHtml += '</div>';
+    chartContainer.innerHTML = chartHtml;
+}
+
+// --- UI RENDERING & DOM MANIPULATION (Management Panels) ---
 
 function renderEmployees(employees) {
     const tableBody = document.querySelector('#employees-table tbody');
@@ -193,33 +247,25 @@ function renderClients(clients) {
 
 function renderTimeEntries(entries) {
     const tableBody = document.querySelector('#time-entries-table tbody');
-    tableBody.innerHTML = ''; // Clear the table first
+    tableBody.innerHTML = '';
     entries.forEach(entry => {
-        const row = tableBody.insertRow();
         const employeeName = entry.employee ? entry.employee.name : 'Unknown';
         const clientName = (entry.employee && entry.employee.client) ? entry.employee.client.name : 'N/A';
-
-        row.insertCell().textContent = employeeName;
-        row.insertCell().textContent = clientName;
-        row.insertCell().textContent = new Date(entry.clock_in).toLocaleString();
-        row.insertCell().textContent = entry.clock_out ? new Date(entry.clock_out).toLocaleString() : 'Active';
-
-        const locationCell = row.insertCell();
-        if (entry.location) {
-            try {
-                const loc = JSON.parse(entry.location);
-                if (loc.latitude && loc.longitude) {
-                    locationCell.innerHTML = `<a href="https://www.google.com/maps?q=${loc.latitude},${loc.longitude}" target="_blank" title="View on Google Maps">🗺️</a>`;
-                }
-            } catch (e) { /* Invalid JSON, do nothing */ }
-        }
-
-        const actionsCell = row.insertCell();
-        actionsCell.innerHTML = `
-            <button onclick="editTimeEntry(${entry.id})">Edit</button>
-            ${!entry.clock_out ? `<button class="secondary" onclick="manualClockOut(${entry.id})">Clock Out</button>` : ''}
-            <button class="secondary" onclick="deleteTimeEntry(${entry.id})">Delete</button>
+        rowHtml = `
+            <tr>
+                <td>${employeeName}</td>
+                <td>${clientName}</td>
+                <td>${new Date(entry.clock_in).toLocaleString()}</td>
+                <td>${entry.clock_out ? new Date(entry.clock_out).toLocaleString() : 'Active'}</td>
+                <td>${entry.location ? `<a href="https://www.google.com/maps?q=${JSON.parse(entry.location).latitude},${JSON.parse(entry.location).longitude}" target="_blank">View Map</a>` : ''}</td>
+                <td>
+                    <button onclick="editTimeEntry(${entry.id})">Edit</button>
+                    ${!entry.clock_out ? `<button class="secondary" onclick="manualClockOut(${entry.id})">Clock Out</button>` : ''}
+                    <button class="secondary" onclick="deleteTimeEntry(${entry.id})">Delete</button>
+                </td>
+            </tr>
         `;
+        tableBody.innerHTML += rowHtml;
     });
 }
 
@@ -241,9 +287,6 @@ function populateEmployeeDropdown() {
     });
 }
 
-/**
- * Displays a non-intrusive toast notification.
- */
 function showToast(message, type = 'success', duration = 4000) {
     const container = document.getElementById('notification-container');
     const toast = document.createElement('div');
@@ -256,7 +299,6 @@ function showToast(message, type = 'success', duration = 4000) {
         setTimeout(() => container.removeChild(toast), 300);
     }, duration);
 }
-
 
 // --- CRUD OPERATIONS: EMPLOYEES ---
 
@@ -303,7 +345,6 @@ async function toggleEmployeeActive(id, currentStatus) {
     }
 }
 
-
 // --- CRUD OPERATIONS: CLIENTS ---
 
 async function saveClient(event) {
@@ -343,7 +384,6 @@ async function deleteClient(id) {
         await loadInitialData();
     }
 }
-
 
 // --- CRUD OPERATIONS: TIME ENTRIES ---
 
@@ -402,7 +442,7 @@ async function deleteTimeEntry(id) {
         showToast('Failed to delete time entry: ' + error.message, 'error');
     } else {
         showToast('Time entry deleted successfully.');
-        await loadInitialData(); // This implicitly reloads via the realtime listener, but good for immediate feedback.
+        await loadInitialData();
     }
 }
 
@@ -413,12 +453,10 @@ async function manualClockOut(entryId) {
         const { error } = await _supabase.from('time_entries').update({ clock_out: new Date().toISOString() }).eq('id', entryId);
         if (error) throw error;
         showToast('Entry successfully clocked out.');
-        // The realtime listener will handle the data refresh.
     } catch (error) {
         showToast(`Failed to clock out: ${error.message}`, 'error');
     }
 }
-
 
 // --- REPORTS & UTILITIES ---
 

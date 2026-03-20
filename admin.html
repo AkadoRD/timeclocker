@@ -24,9 +24,26 @@
 
         <div id="dashboard-panel" class="panel active">
             <h2>Dashboard</h2>
-            <h3>Duplicate Employee IDs</h3>
-            <button onclick="findDuplicateIds()">Find Duplicates</button>
-            <div id="duplicate-id-results"></div>
+            
+            <div class="dashboard-section">
+                <h3>Today's Activity</h3>
+                <div id="todays-activity-list" class="dashboard-list">
+                    <p>Loading...</p>
+                </div>
+            </div>
+
+            <div class="dashboard-section">
+                <h3>Weekly Attendance</h3>
+                <div id="weekly-attendance-chart" class="chart-container">
+                    <p>Loading...</p>
+                </div>
+            </div>
+
+            <div class="dashboard-section">
+                <h3>Admin Tools</h3>
+                <button onclick="findDuplicateIds()">Find Duplicate Employee IDs</button>
+                <div id="duplicate-id-results"></div>
+            </div>
         </div>
 
         <div id="reports-panel" class="panel">
