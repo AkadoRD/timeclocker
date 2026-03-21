@@ -359,19 +359,7 @@ async function toggleEmployeeActive(id, currentStatus) {
     }
 }
 
-// --- CRUD OPERATIONS: CLIENTS ---// --- HACER FUNCIONES GLOBALES PARA QUE LOS BOTONES FUNCIONEN ---
-// Esto conecta los botones de "onclick" del HTML con las funciones de JS
-window.editEmployee = editEmployee;
-window.toggleEmployeeActive = toggleEmployeeActive;
-window.editClient = editClient;
-window.deleteClient = deleteClient;
-window.editTimeEntry = editTimeEntry;
-window.deleteTimeEntry = deleteTimeEntry;
-window.manualClockOut = manualClockOut;
-window.findDuplicateIds = findDuplicateIds;
-window.generateReport = generateReport;
-
-// --- CRUD OPERATIONS: EMPLOYEES ---
+// --- CRUD OPERATIONS: CLIENTS ---
 
 async function saveEmployee(event) {
     event.preventDefault();
@@ -542,3 +530,16 @@ async function findDuplicateIds() {
 async function generateReport() {
     showToast('Report generation logic triggered (Ready to implement export)');
 }
+
+// --- CONECTAR FUNCIONES AL OBJETO WINDOW PARA LOS ONCLICK ---
+// Esto permite que los botones HTML (onclick="function()") funcionen correctamente
+// IMPORTANTE: Debe estar al final del archivo, DESPUÉS de que las funciones estén definidas
+window.editEmployee = editEmployee;
+window.toggleEmployeeActive = toggleEmployeeActive;
+window.editClient = editClient;
+window.deleteClient = deleteClient;
+window.editTimeEntry = editTimeEntry;
+window.deleteTimeEntry = deleteTimeEntry;
+window.manualClockOut = manualClockOut;
+window.findDuplicateIds = findDuplicateIds;
+window.generateReport = generateReport;
