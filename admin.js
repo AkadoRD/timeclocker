@@ -266,7 +266,7 @@ function renderTimeEntries(entries) {
     entries.forEach(entry => {
         const employeeName = entry.employee ? entry.employee.name : 'Unknown';
         const clientName = (entry.employee && entry.employee.client) ? entry.employee.client.name : 'N/A';
-        rowHtml = `
+        const rowHtml = `
             <tr>
                 <td>${employeeName}</td>
                 <td>${clientName}</td>
