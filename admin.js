@@ -55,6 +55,98 @@ async function logEvent(action, tableName, recordId, details = null, status = 's
     }
 }
 
+// --- VALIDATION SYSTEM ---
+/**
+ * Input validation utilities for secure data handling
+ */
+const Validators = {
+    /**
+     * Validate a name field (employee, client)
+     * @returns {string} error message or empty string if valid
+     */
+    validateName: (name) => {
+        if (!name || typeof name !== 'string') return 'Name is required and must be text.';
+        const trimmed = name.trim();
+        if (trimmed.length === 0) return 'Name cannot be empty.';
+        if (trimmed.length > 255) return 'Name must be less than 255 characters.';
+        // Allow only alphanumeric, spaces, and common punctuation
+        if (!/^[a-zA-Z0-9áéíóúñÁÉÍÓÚÑ\s\-\.\']+$/.test(trimmed)) {
+            return 'Name contains invalid characters.';
+        }
+        return '';
+    },
+
+    /**
+     * Validate employee ID (4 digits 0000-9999)
+     * @returns {string} error message or empty string if valid
+     */
+    validateEmployeeID: (id) => {
+        if (!id || typeof id !== 'string') return 'Employee ID is required.';
+        if (!/^\d{4}$/.test(id.trim())) return 'Employee ID must be exactly 4 digits (0000-9999).';
+        return '';
+    },
+
+    /**
+     * Validate email format
+     * @returns {string} error message or empty string if valid
+     */
+    validateEmail: (email) => {
+        if (!email || typeof email !== 'string') return 'Email is required.';
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email.trim())) return 'Please enter a valid email address.';
+        if (email.length > 255) return 'Email is too long.';
+        return '';
+    },
+
+    /**
+     * Validate date/datetime input
+     * @returns {string} error message or empty string if valid
+     */
+    validateDateTime: (dateString) => {
+        if (!dateString) return 'Date and time are required.';
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return 'Invalid date and time format.';
+        return '';
+    },
+
+    /**
+     * Validate UUID format
+     * @returns {string} error message or empty string if valid
+     */
+    validateUUID: (uuid) => {
+        if (!uuid) return 'ID is required.';
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(uuid)) return 'Invalid ID format.';
+        return '';
+    },
+
+    /**
+     * Validate select/dropdown selection
+     * @returns {string} error message or empty string if valid
+     */
+    validateSelection: (value, fieldName = 'Selection') => {
+        if (!value || value === '') return `${fieldName} is required.`;
+        return '';
+    },
+
+    /**
+     * Sanitize input to prevent XSS (basic)
+     * @returns {string} sanitized input
+     */
+    sanitize: (input) => {
+        if (typeof input !== 'string') return input;
+        return input
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#x27;')
+            .trim();
+    }
+};
+
+// --- LOGGING SYSTEM ---
+
 // --- AUTHENTICATION & INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
     checkSessionAndInitialize();
@@ -381,14 +473,29 @@ function showToast(message, type = 'success', duration = 4000) {
 
 async function saveEmployee(event) {
     event.preventDefault();
-    const id = document.getElementById('employee-id-hidden').value;
-    const record = {
-        name: document.getElementById('employee-name').value,
-        employee_id: document.getElementById('employee-id').value,
-        client_id: parseInt(document.getElementById('employee-client').value),
-    };
-
     try {
+        const id = document.getElementById('employee-id-hidden').value;
+        const nameInput = document.getElementById('employee-name').value;
+        const empIdInput = document.getElementById('employee-id').value;
+        const clientIdInput = document.getElementById('employee-client').value;
+
+        // VALIDATION
+        let validationError = Validators.validateName(nameInput);
+        if (validationError) throw new Error(validationError);
+
+        validationError = Validators.validateEmployeeID(empIdInput);
+        if (validationError) throw new Error(validationError);
+
+        validationError = Validators.validateSelection(clientIdInput, 'Client');
+        if (validationError) throw new Error(validationError);
+
+        // Sanitize inputs
+        const record = {
+            name: Validators.sanitize(nameInput),
+            employee_id: empIdInput.trim(),
+            client_id: parseInt(clientIdInput, 10),
+        };
+
         const isUpdate = !!id;
         const { error } = isUpdate ? 
             await _supabase.from('employees').update(record).eq('id', id) : 
@@ -410,7 +517,8 @@ async function saveEmployee(event) {
         document.getElementById('employee-id-hidden').value = '';
         await loadInitialData();
     } catch (error) {
-        await logEvent('create/update', 'employees', null, { name: record.name }, 'failed', error.message);
+        console.error('❌ Error saving employee:', error);
+        await logEvent('create/update', 'employees', null, {}, 'failed', error.message);
         showToast('Failed to save employee: ' + error.message, 'error');
     }
 }
@@ -449,12 +557,19 @@ async function toggleEmployeeActive(id, currentStatus) {
 
 async function saveClient(event) {
     event.preventDefault();
-    const id = document.getElementById('client-id-hidden').value;
-    const record = { 
-        name: document.getElementById('client-name').value,
-    };
-
     try {
+        const id = document.getElementById('client-id-hidden').value;
+        const nameInput = document.getElementById('client-name').value;
+
+        // VALIDATION
+        let validationError = Validators.validateName(nameInput);
+        if (validationError) throw new Error(validationError);
+
+        // Sanitize input
+        const record = { 
+            name: Validators.sanitize(nameInput),
+        };
+
         const isUpdate = !!id;
         const { error } = isUpdate ? 
             await _supabase.from('clients').update(record).eq('id', id) : 
@@ -476,7 +591,8 @@ async function saveClient(event) {
         document.getElementById('client-id-hidden').value = '';
         await loadInitialData();
     } catch (error) {
-        await logEvent('create/update', 'clients', null, { name: record.name }, 'failed', error.message);
+        console.error('❌ Error saving client:', error);
+        await logEvent('create/update', 'clients', null, {}, 'failed', error.message);
         showToast('Failed to save client: ' + error.message, 'error');
     }
 }
@@ -512,22 +628,39 @@ async function deleteClient(id) {
 
 async function saveTimeEntry(event) {
     event.preventDefault();
-    const id = document.getElementById('time-entry-id-hidden').value;
-    const employeeId = document.getElementById('time-entry-employee').value;
-    const clockIn = document.getElementById('time-entry-clock-in').value;
-    const clockOut = document.getElementById('time-entry-clock-out').value;
-
-    const selectedEmployee = allEmployees.find(e => e.id == employeeId);
-    if (!selectedEmployee) return showToast("Invalid employee selected", "error");
-
-    const record = {
-        employee_id: selectedEmployee.employee_id,
-        client_id: selectedEmployee.client_id,
-        clock_in: new Date(clockIn).toISOString(),
-        clock_out: clockOut ? new Date(clockOut).toISOString() : null,
-    };
-
     try {
+        const id = document.getElementById('time-entry-id-hidden').value;
+        const employeeId = document.getElementById('time-entry-employee').value;
+        const clockInInput = document.getElementById('time-entry-clock-in').value;
+        const clockOutInput = document.getElementById('time-entry-clock-out').value;
+
+        // VALIDATION
+        let validationError = Validators.validateSelection(employeeId, 'Employee');
+        if (validationError) throw new Error(validationError);
+
+        validationError = Validators.validateDateTime(clockInInput);
+        if (validationError) throw new Error('Clock In: ' + validationError);
+
+        if (clockOutInput) {
+            validationError = Validators.validateDateTime(clockOutInput);
+            if (validationError) throw new Error('Clock Out: ' + validationError);
+            
+            // Validate clock_out is after clock_in
+            if (new Date(clockOutInput) < new Date(clockInInput)) {
+                throw new Error('Clock Out time must be after Clock In time.');
+            }
+        }
+
+        const selectedEmployee = allEmployees.find(e => e.id == employeeId);
+        if (!selectedEmployee) throw new Error('Invalid employee selected.');
+
+        const record = {
+            employee_id: selectedEmployee.employee_id,
+            client_id: selectedEmployee.client_id,
+            clock_in: new Date(clockInInput).toISOString(),
+            clock_out: clockOutInput ? new Date(clockOutInput).toISOString() : null,
+        };
+
         const isUpdate = !!id;
         const { error } = isUpdate ? 
             await _supabase.from('time_entries').update(record).eq('id', id) : 
@@ -549,6 +682,7 @@ async function saveTimeEntry(event) {
         document.getElementById('time-entry-id-hidden').value = '';
         await loadInitialData();
     } catch (error) {
+        console.error('❌ Error saving time entry:', error);
         await logEvent('create/update', 'time_entries', null, {}, 'failed', error.message);
         showToast('Failed to save time entry: ' + error.message, 'error');
     }
