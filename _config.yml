@@ -1,0 +1,14 @@
+theme: null
+url: "https://akadord.github.io"
+baseurl: "/timeclocker"
+exclude:
+  - firebase.json
+  - package.json
+  - package-lock.json
+  - node_modules
+  - supabase
+  - .firebase
+  - .idx
+  - get-docker.sh
+  - plan.txt
+  - "*.tar.gz"
