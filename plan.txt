@@ -1,28 +1,140 @@
-### Plan de Desarrollo de la App Time-Clock
+================================================================================
+                    TIMECLOCKER - PLAN DE DESARROLLO v2.0
+                          (Nuevo Comienzo - Fase Profesional)
+                              Inicio: Marzo 21, 2026
+================================================================================
 
-**Nivel 0: Tareas de Corrección Inmediata (MÁXIMA PRIORIDAD)**
+================================================================================
+🎯 FASE 1: ROBUSTEZ & CONFIABILIDAD (Semana 1 - ACTUAL)
+================================================================================
 
-*   **Tarea 10: Diagnosticar y corregir `SyntaxError` en `admin.js`. [PENDIENTE]**
-    *   **Contexto:** Tras el último intento de arreglar el botón "Editar Fichaje" (`git push` con hash `7f3ef45`), se introdujo un error de sintaxis ("Invalid or unexpected token") que impide que la página de administración funcione correctamente.
-    *   **Objetivo Inmediato:** Analizar el archivo `admin.js` para encontrar el error de sintaxis exacto y corregirlo. La página debe cargar sin errores de consola.
+**Prioridad: CRÍTICA** - Estas son las mejoras que separan apps profesionales de MVPs
 
-*   **Tarea 11: Reparar la funcionalidad del botón "Editar Fichaje". [PENDIENTE]**
-    *   **Contexto:** Es la tarea original que estábamos intentando resolver. Actualmente, al hacer clic en "Editar" en la tabla de fichajes, no ocurre nada.
-    *   **Objetivo Final:** Una vez resuelto el `SyntaxError`, la función `editTimeEntry` debe funcionar correctamente, rellenando el formulario superior con los datos del fichaje seleccionado para poder modificarlo.
+[  ] TAREA 1.1: Error Handling Robusto en funciones críticas
+     - Agregar try/catch en: saveEmployee, editEmployee, saveTimeEntry, etc
+     - Errores de Supabase deben mostrar mensaje amigable al usuario
+     - Fallback graceful (no app crashes)
+     Estimado: 2-3 horas
+     Archivos: admin.js, main.js
 
----
+[  ] TAREA 1.2: Sistema de Logging Básico
+     - Crear función logEvent(action, userID, details, status)
+     - Guardar en tabla 'activity_logs' en Supabase
+     - Registro: quién hizo qué, cuándo, resultado
+     - Útil para debugging en producción
+     Estimado: 2 horas
+     Archivos: admin.js, main.js (nueva tabla Supabase)
 
-### Historial de Tareas Completadas
+[  ] TAREA 1.3: Validación de Entrada Robusta
+     - Validar tipos (string, number, date, uuid)
+     - Validar longitudes (nombres < 255, emails válidos)
+     - Sanitizar IDs para prevenir injection
+     Estimado: 1-2 horas
+     Archivos: admin.js, main.js
 
-*   **Incidencia Crítica (24/07/2024): Restaurar la interfaz de administrador. [COMPLETADO]**
-    *   **Resumen:** Se realizó un despliegue erróneo que sobrescribió la nueva interfaz del panel de administrador con una versión antigua y rota. Se revirtió el `commit` problemático (`ba4a479`) y se forzó la restauración del `commit` correcto (`c4addc7`) al servidor, recuperando el trabajo del usuario.
+[  ] TAREA 1.4: Rate Limiting en Supabase RLS
+     - Prevenir abuso de API (máx 100 inserts/min por usuario)
+     - Configurar políticas RLS más estrictas
+     Estimado: 1.5 horas
+     Archivos: Supabase RLS policies
 
-*   **Tarea 1: Implementar Suscripciones de Supabase Realtime. [COMPLETADO]**
-*   **Tarea 2: Revertir el PIN para Empleados. [COMPLETADO]**
-*   **Tarea 3: Mejorar el Modo Sin Conexión. [COMPLETADO]**
-*   **Tarea 4: Captura de Geolocalización al Fichar. [COMPLETADO]**
-*   **Tarea 5: Autenticación de Administrador Robusta. [COMPLETADO]**
-*   **Tarea 6: Configurar un Dominio Personalizado. [COMPLETADO]**
-*   **Tarea 7: Proteger las Claves de la API (API Keys). [COMPLETADO]**
-*   **Tarea 8: Arreglar el Registro de Administrador. [COMPLETADO]**
-*   **Tarea 9: Eliminar el Requisito de PIN para Empleados. [COMPLETADO]**
+================================================================================
+🔐 FASE 2: CUMPLIMIENTO & AUDITORÍA (Semana 2)
+================================================================================
+
+[  ] TAREA 2.1: Sistema de Auditoría Completo
+     - Registrar TODOS los cambios: create, update, delete
+     - Tabla 'audit_log': usuario, acción, tabla, cambios, timestamp
+     - Permitir "ver quién editó qué y cuándo"
+     Estimado: 3-4 horas
+     Archivos: admin.js, Supabase migrations
+
+[  ] TAREA 2.2: Backup Automático de Base de Datos
+     - Script que haga backup de Supabase 1x por semana
+     - Guardar en almacenamiento seguro (GitHub Actions o cloud)
+     Estimado: 2 horas
+     Archivos: .github/workflows (nuevo)
+
+[  ] TAREA 2.3: Retención de Datos & GDPR
+     - Documentar políticas de retención (cuánto tiempo guardamos datos)
+     - Implementar eliminación de datos antigos (opcional)
+     Estimado: 1 hora
+
+================================================================================
+📊 FASE 3: ANALYTICS & MONITORING (Semana 3)
+================================================================================
+
+[  ] TAREA 3.1: Error Tracking (Sentry o alternativa)
+     - Capturar errores en producción automáticamente
+     - Alertas cuando falle algo importante
+     Estimado: 2 horas
+     Archivos: admin.js, main.js
+
+[  ] TAREA 3.2: Performance Monitoring
+     - Medir tiempo de carga de páginas
+     - Detectar funciones lentas
+     Estimado: 1.5 horas
+
+[  ] TAREA 3.3: Analytics Básico
+     - Cuántos empleados fichar hoy?
+     - Qué botones usan más?
+     - Tasa de errores
+     Estimado: 2 horas
+
+================================================================================
+✨ FASE 4: FEATURES AVANZADOS (Mes 2)
+================================================================================
+
+[  ] TAREA 4.1: Exportar Reportes (Excel/PDF)
+[  ] TAREA 4.2: Búsqueda y Filtros Avanzados
+[  ] TAREA 4.3: Tema Oscuro/Claro
+[  ] TAREA 4.4: Notificaciones Push
+[  ] TAREA 4.5: Integración Payroll
+
+================================================================================
+✅ HISTORIAL DE TAREAS COMPLETADAS
+================================================================================
+
+**FASE INICIAL (MVP) - Completado Marzo 2024 - Marzo 2026**
+
+✅ Tarea 1: Implementar Suscripciones de Supabase Realtime
+✅ Tarea 2: Autenticación de Empleados (ID)
+✅ Tarea 3: Geolocalización al Fichar
+✅ Tarea 4: Panel de Administrador CRUD
+✅ Tarea 5: Autenticación de Administrador (Email/Password)
+✅ Tarea 6: Modo Offline con Service Worker
+✅ Tarea 7: Reportes Básicos
+✅ Tarea 8: PWA Instalable en Celular
+✅ Tarea 9: Modo Kiosco (bloqueo de scroll/zoom)
+✅ Tarea 10: Deep Clean - Eliminar SyntaxError en admin.js
+✅ Tarea 11: Reparar botones Edit/Clock Out con onclick handlers
+✅ Tarea 12: Implementar Kiosk Mode fullscreen
+
+**Commits Clave del MVP:**
+    - 11e83b3: fix: onclick parameter quoting
+    - 34dd3b5: feat: initial kiosk mode implementation
+    - 62f8988: fix: strengthen kiosk mode with fullscreen
+
+================================================================================
+📈 PROGRESO GENERAL
+================================================================================
+
+MVP COMPLETADO: ████████████████████ 100% ✅
+Fase 1 (Robustez):  ░░░░░░░░░░░░░░░░░░░░   0% (Por comenzar)
+Fase 2 (Auditoría): ░░░░░░░░░░░░░░░░░░░░   0%
+Fase 3 (Analytics): ░░░░░░░░░░░░░░░░░░░░   0%
+Fase 4 (Features):  ░░░░░░░░░░░░░░░░░░░░   0%
+
+Total App: ████████████░░░░░░░ ~65% Profesional
+
+================================================================================
+📝 NOTAS IMPORTANTES
+================================================================================
+
+1. Las tareas se marcarán [X] cuando estén COMPLETADAS
+2. Cada tarea completada genera un commit con descipción clara
+3. Los commits se listan en el historial arriba
+4. La barra de progreso se actualiza conforme avancemos
+5. Cualquier bug/issue nuevo se agrega aquí con prioridad
+
+================================================================================
