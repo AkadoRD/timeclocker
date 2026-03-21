@@ -8,6 +8,34 @@
  * - Offline action caching and synchronization.
  */
 
+// === KIOSK MODE INITIALIZATION ===
+// Disable all gestures and movements for kiosk/tablet display
+(() => {
+    // Prevent context menu (right-click)
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    
+    // Prevent all scroll
+    document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+    document.addEventListener('scroll', () => window.scrollTo(0, 0), { passive: false });
+    
+    // Prevent zoom
+    document.addEventListener('gesturestart', e => e.preventDefault());
+    document.addEventListener('touchstart', e => {
+        if (e.touches.length > 1) e.preventDefault();
+    }, { passive: false });
+    
+    // Prevent pull-to-refresh (Android)
+    let lastY = 0;
+    document.addEventListener('touchstart', e => { lastY = e.touches[0].clientY; }, { passive: false });
+    document.addEventListener('touchmove', e => {
+        const diff = e.touches[0].clientY - lastY;
+        if (diff > 0 && window.scrollY === 0) e.preventDefault();
+    }, { passive: false });
+    
+    // Lock viewport position
+    window.scrollTo(0, 0);
+})();
+
 document.addEventListener('DOMContentLoaded', () => {
 
     // --- CORE APP SETUP ---
