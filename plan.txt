@@ -20,13 +20,13 @@
      Estimado: 2-3h | Real: 1h (RAPIDO)
      Archivos: admin.js
 
-[  ] TAREA 1.2: Sistema de Logging Básico
-     - Crear función logEvent(action, userID, details, status)
-     - Guardar en tabla 'activity_logs' en Supabase
-     - Registro: quién hizo qué, cuándo, resultado
-     - Útil para debugging en producción
-     Estimado: 2 horas
-     Archivos: admin.js, main.js (nueva tabla Supabase)
+[X] TAREA 1.2: Sistema de Logging Básico - COMPLETADA
+     - Crear tabla activity_logs en Supabase
+     - Integrar logEvent() en funciones CRUD
+     - Registra: usuario, acción, tabla, record_id, detalles, status, timestamp
+     Commit: 0d93ff9
+     Estimado: 2h | Real: 1.5h (RAPIDO)
+     Archivos: admin.js, migrations
 
 [  ] TAREA 1.3: Validación de Entrada Robusta
      - Validar tipos (string, number, date, uuid)
@@ -123,7 +123,7 @@
 ================================================================================
 
 MVP COMPLETADO: ████████████████████ 100% ✓
-Fase 1 (Robustez):  █░░░░░░░░░░░░░░░░░░  25% (1/4 tasks done)
+Fase 1 (Robustez):  ██████░░░░░░░░░░░░░░  50% (2/4 tasks done)
 Fase 2 (Auditoría): ░░░░░░░░░░░░░░░░░░░░   0%
 Fase 3 (Analytics): ░░░░░░░░░░░░░░░░░░░░   0%
 Fase 4 (Features):  ░░░░░░░░░░░░░░░░░░░░   0%
