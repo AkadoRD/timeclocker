@@ -17,6 +17,43 @@ const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let allEmployees = [];
 let allClients = [];
 let timeEntriesListener = null;
+let currentUser = null;
+
+// --- LOGGING SYSTEM ---
+/**
+ * Logs an action to the activity_logs table for auditing and debugging.
+ * @param {string} action - Action type: create, update, delete, clock_in, clock_out, auth_error
+ * @param {string} tableName - Table name: employees, clients, time_entries
+ * @param {string|null} recordId - ID of the affected record
+ * @param {object|null} details - Additional details about the action
+ * @param {string} status - 'success' or 'failed'
+ * @param {string|null} errorMessage - Error message if status is 'failed'
+ */
+async function logEvent(action, tableName, recordId, details = null, status = 'success', errorMessage = null) {
+    try {
+        if (!currentUser) return; // Don't log if user not authenticated
+        
+        const logData = {
+            user_id: currentUser.id,
+            action,
+            table_name: tableName,
+            record_id: recordId,
+            details: details ? JSON.stringify(details) : null,
+            status,
+            error_message: errorMessage
+        };
+
+        const { error } = await _supabase.from('activity_logs').insert([logData]);
+        if (error) {
+            console.error('❌ Failed to log activity:', error);
+        } else {
+            console.log(`✓ Activity logged: ${action} on ${tableName}`);
+        }
+    } catch (err) {
+        console.error('❌ Error in logEvent:', err);
+        // Don't throw - logging should never break the app
+    }
+}
 
 // --- AUTHENTICATION & INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -31,6 +68,9 @@ async function checkSessionAndInitialize() {
             return;
         }
 
+        // Store current user for logging
+        currentUser = session.user;
+
         // Populate profile form with user data
         const user = session.user;
         document.getElementById('profile-name').value = user.user_metadata.name || '';
@@ -40,9 +80,15 @@ async function checkSessionAndInitialize() {
         await loadInitialData();
         subscribeToTimeEntries();
         setupEventListeners();
+        
+        // Log successful initialization
+        await logEvent('auth_success', 'auth', user.id, { email: user.email }, 'success');
 
     } catch (err) {
         console.error("Error during session check:", err);
+        if (currentUser) {
+            await logEvent('auth_error', 'auth', currentUser.id, { action: 'session_check' }, 'failed', err.message);
+        }
         document.body.innerHTML = `<div>Authentication Error: ${err.message}. <a href="admin_login.html">Return to Login</a></div>`;
     }
 }
@@ -343,13 +389,28 @@ async function saveEmployee(event) {
     };
 
     try {
-        const { error } = id ? await _supabase.from('employees').update(record).eq('id', id) : await _supabase.from('employees').insert([record]);
+        const isUpdate = !!id;
+        const { error } = isUpdate ? 
+            await _supabase.from('employees').update(record).eq('id', id) : 
+            await _supabase.from('employees').insert([record]);
+        
         if (error) throw error;
+        
+        // Log the action
+        await logEvent(
+            isUpdate ? 'update' : 'create',
+            'employees',
+            id || record.employee_id,
+            { name: record.name, employee_id: record.employee_id },
+            'success'
+        );
+        
         showToast('Employee saved successfully.');
         document.getElementById('employee-form').reset();
         document.getElementById('employee-id-hidden').value = '';
         await loadInitialData();
     } catch (error) {
+        await logEvent('create/update', 'employees', null, { name: record.name }, 'failed', error.message);
         showToast('Failed to save employee: ' + error.message, 'error');
     }
 }
@@ -372,10 +433,14 @@ async function toggleEmployeeActive(id, currentStatus) {
         const { error } = await _supabase.from('employees').update({ active: !currentStatus }).eq('id', id);
         if (error) throw error;
         
+        // Log the action
+        await logEvent('update', 'employees', id, { active: !currentStatus }, 'success');
+        
         showToast(`Employee ${!currentStatus ? 'activated' : 'deactivated'}.`, 'success');
         await loadInitialData();
     } catch (error) {
         console.error('❌ Error toggling employee status:', error);
+        await logEvent('update', 'employees', id, { action: 'toggle_active' }, 'failed', error.message);
         showToast('Failed to update employee status: ' + error.message, 'error');
     }
 }
@@ -390,13 +455,28 @@ async function saveClient(event) {
     };
 
     try {
-        const { error } = id ? await _supabase.from('clients').update(record).eq('id', id) : await _supabase.from('clients').insert([record]);
+        const isUpdate = !!id;
+        const { error } = isUpdate ? 
+            await _supabase.from('clients').update(record).eq('id', id) : 
+            await _supabase.from('clients').insert([record]);
+        
         if (error) throw error;
+        
+        // Log the action
+        await logEvent(
+            isUpdate ? 'update' : 'create',
+            'clients',
+            id || record.name,
+            { name: record.name },
+            'success'
+        );
+        
         showToast('Client saved successfully.');
         document.getElementById('client-form').reset();
         document.getElementById('client-id-hidden').value = '';
         await loadInitialData();
     } catch (error) {
+        await logEvent('create/update', 'clients', null, { name: record.name }, 'failed', error.message);
         showToast('Failed to save client: ' + error.message, 'error');
     }
 }
@@ -416,10 +496,14 @@ async function deleteClient(id) {
         const { error } = await _supabase.from('clients').delete().eq('id', id);
         if (error) throw error;
         
+        // Log the action
+        await logEvent('delete', 'clients', id, {}, 'success');
+        
         showToast('Client deleted successfully.', 'success');
         await loadInitialData();
     } catch (error) {
         console.error('❌ Error deleting client:', error);
+        await logEvent('delete', 'clients', id, {}, 'failed', error.message);
         showToast('Error deleting client: ' + error.message, 'error');
     }
 }
@@ -444,13 +528,28 @@ async function saveTimeEntry(event) {
     };
 
     try {
-        const { error } = id ? await _supabase.from('time_entries').update(record).eq('id', id) : await _supabase.from('time_entries').insert([record]);
+        const isUpdate = !!id;
+        const { error } = isUpdate ? 
+            await _supabase.from('time_entries').update(record).eq('id', id) : 
+            await _supabase.from('time_entries').insert([record]);
+        
         if (error) throw error;
+        
+        // Log the action
+        await logEvent(
+            isUpdate ? 'update' : 'create',
+            'time_entries',
+            id,
+            { employee_id: selectedEmployee.employee_id, clock_in: record.clock_in, clock_out: record.clock_out },
+            'success'
+        );
+        
         showToast('Time entry saved successfully.');
         document.getElementById('time-entry-form').reset();
         document.getElementById('time-entry-id-hidden').value = '';
         await loadInitialData();
     } catch (error) {
+        await logEvent('create/update', 'time_entries', null, {}, 'failed', error.message);
         showToast('Failed to save time entry: ' + error.message, 'error');
     }
 }
@@ -498,10 +597,14 @@ async function deleteTimeEntry(id) {
         const { error } = await _supabase.from('time_entries').delete().eq('id', id);
         if (error) throw error;
         
+        // Log the action
+        await logEvent('delete', 'time_entries', id, {}, 'success');
+        
         showToast('Time entry deleted successfully.', 'success');
         await loadInitialData();
     } catch (error) {
         console.error('❌ Error deleting time entry:', error);
+        await logEvent('delete', 'time_entries', id, {}, 'failed', error.message);
         showToast('Error deleting time entry: ' + error.message, 'error');
     }
 }
