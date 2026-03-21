@@ -361,53 +361,6 @@ async function toggleEmployeeActive(id, currentStatus) {
 
 // --- CRUD OPERATIONS: CLIENTS ---
 
-async function saveEmployee(event) {
-    event.preventDefault();
-    const id = document.getElementById('employee-id-hidden').value;
-    const record = {
-        name: document.getElementById('employee-name').value,
-        employee_id: document.getElementById('employee-id').value,
-        client_id: parseInt(document.getElementById('employee-client').value),
-    };
-
-    try {
-        const { error } = id ? await _supabase.from('employees').update(record).eq('id', id) : await _supabase.from('employees').insert([record]);
-        if (error) throw error;
-        showToast('Employee saved successfully.');
-        document.getElementById('employee-form').reset();
-        document.getElementById('employee-id-hidden').value = '';
-        await loadInitialData();
-    } catch (error) {
-        showToast('Failed to save employee: ' + error.message, 'error');
-    }
-}
-
-function editEmployee(id) {
-    const emp = allEmployees.find(e => e.id === id);
-    if (!emp) return showToast('Could not find employee data.', 'error');
-    
-    document.getElementById('employee-id-hidden').value = emp.id;
-    document.getElementById('employee-name').value = emp.name;
-    document.getElementById('employee-id').value = emp.employee_id;
-    document.getElementById('employee-client').value = emp.client_id;
-    
-    // Cambiar a la pestaña de empleados y hacer scroll al formulario
-    document.querySelector('[data-panel="employees-panel"]').click();
-    document.getElementById('employees-panel').scrollIntoView();
-}
-
-async function toggleEmployeeActive(id, currentStatus) {
-    const { error } = await _supabase.from('employees').update({ active: !currentStatus }).eq('id', id);
-    if (error) {
-        showToast('Failed to update employee status.', 'error');
-    } else {
-        showToast(`Employee ${!currentStatus ? 'activated' : 'deactivated'}.`, 'success');
-        await loadInitialData();
-    }
-}
-
-// --- CRUD OPERATIONS: CLIENTS ---
-
 async function saveClient(event) {
     event.preventDefault();
     const id = document.getElementById('client-id-hidden').value;
