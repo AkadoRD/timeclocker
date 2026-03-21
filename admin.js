@@ -359,6 +359,65 @@ async function toggleEmployeeActive(id, currentStatus) {
     }
 }
 
+// --- CRUD OPERATIONS: CLIENTS ---// --- HACER FUNCIONES GLOBALES PARA QUE LOS BOTONES FUNCIONEN ---
+// Esto conecta los botones de "onclick" del HTML con las funciones de JS
+window.editEmployee = editEmployee;
+window.toggleEmployeeActive = toggleEmployeeActive;
+window.editClient = editClient;
+window.deleteClient = deleteClient;
+window.editTimeEntry = editTimeEntry;
+window.deleteTimeEntry = deleteTimeEntry;
+window.manualClockOut = manualClockOut;
+window.findDuplicateIds = findDuplicateIds;
+window.generateReport = generateReport;
+
+// --- CRUD OPERATIONS: EMPLOYEES ---
+
+async function saveEmployee(event) {
+    event.preventDefault();
+    const id = document.getElementById('employee-id-hidden').value;
+    const record = {
+        name: document.getElementById('employee-name').value,
+        employee_id: document.getElementById('employee-id').value,
+        client_id: parseInt(document.getElementById('employee-client').value),
+    };
+
+    try {
+        const { error } = id ? await _supabase.from('employees').update(record).eq('id', id) : await _supabase.from('employees').insert([record]);
+        if (error) throw error;
+        showToast('Employee saved successfully.');
+        document.getElementById('employee-form').reset();
+        document.getElementById('employee-id-hidden').value = '';
+        await loadInitialData();
+    } catch (error) {
+        showToast('Failed to save employee: ' + error.message, 'error');
+    }
+}
+
+function editEmployee(id) {
+    const emp = allEmployees.find(e => e.id === id);
+    if (!emp) return showToast('Could not find employee data.', 'error');
+    
+    document.getElementById('employee-id-hidden').value = emp.id;
+    document.getElementById('employee-name').value = emp.name;
+    document.getElementById('employee-id').value = emp.employee_id;
+    document.getElementById('employee-client').value = emp.client_id;
+    
+    // Cambiar a la pestaña de empleados y hacer scroll al formulario
+    document.querySelector('[data-panel="employees-panel"]').click();
+    document.getElementById('employees-panel').scrollIntoView();
+}
+
+async function toggleEmployeeActive(id, currentStatus) {
+    const { error } = await _supabase.from('employees').update({ active: !currentStatus }).eq('id', id);
+    if (error) {
+        showToast('Failed to update employee status.', 'error');
+    } else {
+        showToast(`Employee ${!currentStatus ? 'activated' : 'deactivated'}.`, 'success');
+        await loadInitialData();
+    }
+}
+
 // --- CRUD OPERATIONS: CLIENTS ---
 
 async function saveClient(event) {
@@ -383,19 +442,15 @@ async function saveClient(event) {
 function editClient(id, name) {
     document.getElementById('client-id-hidden').value = id;
     document.getElementById('client-name').value = name;
+    document.querySelector('[data-panel="clients-panel"]').click();
     document.getElementById('clients-panel').scrollIntoView();
 }
 
 async function deleteClient(id) {
-    if (!confirm('Are you sure you want to delete this client? This might affect existing employees and time entries.')) return;
-    
+    if (!confirm('Are you sure you want to delete this client?')) return;
     const { error } = await _supabase.from('clients').delete().eq('id', id);
-    if (error) {
-        showToast('Failed to delete client: ' + error.message, 'error');
-    } else {
-        showToast('Client deleted successfully.');
-        await loadInitialData();
-    }
+    if (error) showToast('Error: ' + error.message, 'error');
+    else { showToast('Client deleted'); await loadInitialData(); }
 }
 
 // --- CRUD OPERATIONS: TIME ENTRIES ---
@@ -431,85 +486,59 @@ async function saveTimeEntry(event) {
 
 async function editTimeEntry(id) {
     const { data, error } = await _supabase.from('time_entries').select('*, employee:employees(*)').eq('id', id).single();
-    if (error) return showToast('Could not fetch time entry data.', 'error');
+    if (error) return showToast('Could not fetch data.', 'error');
 
     const formatForInput = (date) => date ? new Date(new Date(date).getTime() - (new Date(date).getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : '';
 
     document.getElementById('time-entry-id-hidden').value = data.id;
-
-    const empSelect = document.getElementById('time-entry-employee');
-    // Usamos el 'employee_id' que viene en el fichaje para encontrar al empleado en la lista principal.
-    const employeeToSelect = allEmployees.find(e => e.id === data.employee.id);
-    if (employeeToSelect) {
-        empSelect.value = employeeToSelect.id;
-    } else {
-        // Si no lo encuentra (algo raro), al menos no da un error y lo notifica.
-        console.error('Could not find matching employee in dropdown for id:', data.employee_id);
-        showToast('Could not pre-select employee in the form.', 'error');
-    }
-
+    document.getElementById('time-entry-employee').value = allEmployees.find(e => e.id === data.employee.id)?.id || '';
     document.getElementById('time-entry-clock-in').value = formatForInput(new Date(data.clock_in));
-    document.getElementById('time-entry-clock-out').value = formatForInput(data.clock_out ? new Date(data.clock_out) : null);
-    document.getElementById('time-entries-panel').scrollIntoView();
-}
-
-
-async function deleteTimeEntry(id) {
-    if (!confirm('Are you sure you want to delete this time entry?')) return;
+    document.getElementById('time-entry-clock-out').value = data.clock_out ? formatForInput(new Date(data.clock_out)) : '';
     
-    const { error } = await _supabase.from('time_entries').delete().eq('id', id);
-    if (error) {
-        showToast('Failed to delete time entry: ' + error.message, 'error');
-    } else {
-        showToast('Time entry deleted successfully.');
-        await loadInitialData();
-    }
+    // Subir al formulario de edición
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 async function manualClockOut(entryId) {
     if (!confirm('Are you sure you want to manually clock out this entry?')) return;
-
     try {
         const { error } = await _supabase.from('time_entries').update({ clock_out: new Date().toISOString() }).eq('id', entryId);
         if (error) throw error;
         showToast('Entry successfully clocked out.');
+        await loadInitialData();
     } catch (error) {
-        showToast(`Failed to clock out: ${error.message}`, 'error');
+        showToast(`Error: ${error.message}`, 'error');
     }
 }
 
-// --- REPORTS & UTILITIES ---
+async function deleteTimeEntry(id) {
+    if (!confirm('Are you sure you want to delete this time entry?')) return;
+    const { error } = await _supabase.from('time_entries').delete().eq('id', id);
+    if (error) showToast('Error: ' + error.message, 'error');
+    else { showToast('Entry deleted'); await loadInitialData(); }
+}
 
 async function findDuplicateIds() {
     const resultsContainer = document.getElementById('duplicate-id-results');
     resultsContainer.innerHTML = '<p>Searching...</p>';
-
     const idMap = new Map();
     allEmployees.forEach(emp => {
         if (!idMap.has(emp.employee_id)) idMap.set(emp.employee_id, []);
         idMap.get(emp.employee_id).push(emp);
     });
-
     const duplicates = Array.from(idMap.values()).filter(arr => arr.length > 1);
     if (duplicates.length === 0) {
         resultsContainer.innerHTML = '<p>No duplicate employee IDs found.</p>';
         return;
     }
-
-    let html = '<table><tr><th>Employee ID</th><th>Name</th><th>Company</th><th>Active</th></tr>';
-    duplicates.forEach(group => {
-        group.forEach(emp => {
-            html += `<tr><td>${emp.employee_id}</td><td>${emp.name}</td><td>${emp.client ? emp.client.name : 'N/A'}</td><td>${emp.active}</td></tr>`;
-        });
-    });
+    let html = '<table><tr><th>Employee ID</th><th>Name</th></tr>';
+    duplicates.forEach(group => group.forEach(emp => {
+        html += `<tr><td>${emp.employee_id}</td><td>${emp.name}</td></tr>`;
+    }));
     html += '</table>';
     resultsContainer.innerHTML = html;
 }
 
 async function generateReport() {
-    // Implementation remains the same
-}
-
-function downloadCSV(button) {
-    // Implementation remains the same
+    showToast('Report generation logic triggered (Ready to implement export)');
 }

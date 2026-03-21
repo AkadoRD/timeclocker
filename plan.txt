@@ -1,32 +1,28 @@
 ### Plan de Desarrollo de la App Time-Clock
 
-**Nivel 1: Funcionalidad en Tiempo Real (La Máxima Prioridad)**
+**Nivel 0: Tareas de Corrección Inmediata (MÁXIMA PRIORIDAD)**
+
+*   **Tarea 10: Diagnosticar y corregir `SyntaxError` en `admin.js`. [PENDIENTE]**
+    *   **Contexto:** Tras el último intento de arreglar el botón "Editar Fichaje" (`git push` con hash `7f3ef45`), se introdujo un error de sintaxis ("Invalid or unexpected token") que impide que la página de administración funcione correctamente.
+    *   **Objetivo Inmediato:** Analizar el archivo `admin.js` para encontrar el error de sintaxis exacto y corregirlo. La página debe cargar sin errores de consola.
+
+*   **Tarea 11: Reparar la funcionalidad del botón "Editar Fichaje". [PENDIENTE]**
+    *   **Contexto:** Es la tarea original que estábamos intentando resolver. Actualmente, al hacer clic en "Editar" en la tabla de fichajes, no ocurre nada.
+    *   **Objetivo Final:** Una vez resuelto el `SyntaxError`, la función `editTimeEntry` debe funcionar correctamente, rellenando el formulario superior con los datos del fichaje seleccionado para poder modificarlo.
+
+---
+
+### Historial de Tareas Completadas
+
+*   **Incidencia Crítica (24/07/2024): Restaurar la interfaz de administrador. [COMPLETADO]**
+    *   **Resumen:** Se realizó un despliegue erróneo que sobrescribió la nueva interfaz del panel de administrador con una versión antigua y rota. Se revirtió el `commit` problemático (`ba4a479`) y se forzó la restauración del `commit` correcto (`c4addc7`) al servidor, recuperando el trabajo del usuario.
 
 *   **Tarea 1: Implementar Suscripciones de Supabase Realtime. [COMPLETADO]**
-    *   **Objetivo:** Modificar el `admin.html` para "escuchar" cambios en la base de datos. Cuando un empleado fiche (un `INSERT` en `time_entries`), la tabla en el panel del administrador se actualizará automáticamente sin necesidad de recargar la página.
-
-**Nivel 2: Mejoras Críticas de Seguridad y Funcionalidad**
-
 *   **Tarea 2: Revertir el PIN para Empleados. [COMPLETADO]**
-    *   **Objetivo:** Simplificar el proceso de fichaje eliminando la necesidad de introducir un PIN, dejando solo el ID de empleado. Esto revierte la decisión anterior.
 *   **Tarea 3: Mejorar el Modo Sin Conexión. [COMPLETADO]**
-    *   **Objetivo:** Mejorar la lógica en `index.html` para que también guarde los fichajes de salida (`clock-out`) sin conexión y los sincronice después.
-
-**Nivel 3: Características Profesionales (Para Competir en el Mercado)**
-
 *   **Tarea 4: Captura de Geolocalización al Fichar. [COMPLETADO]**
-    *   **Objetivo:** Guardar las coordenadas GPS del dispositivo en el momento del `clock-in` y `clock-out`.
 *   **Tarea 5: Autenticación de Administrador Robusta. [COMPLETADO]**
-    *   **Objetivo:** Cambiar el sistema de PIN del administrador por un sistema de `email` y `contraseña` usando el módulo de Autenticación de Supabase.
-
-**Nivel 4: Despliegue y Mantenimiento**
-
 *   **Tarea 6: Configurar un Dominio Personalizado. [COMPLETADO]**
 *   **Tarea 7: Proteger las Claves de la API (API Keys). [COMPLETADO]**
-
-**Nuevas Tareas Post-Despliegue:**
-
 *   **Tarea 8: Arreglar el Registro de Administrador. [COMPLETADO]**
-    *   **Objetivo:** Diagnosticar y solucionar el problema que impedía completar el registro de un nuevo administrador.
 *   **Tarea 9: Eliminar el Requisito de PIN para Empleados. [COMPLETADO]**
-    *   **Objetivo:** Simplificar el proceso de fichaje eliminando la necesidad de introducir un PIN, dejando solo el ID de empleado.
