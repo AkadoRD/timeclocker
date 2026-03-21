@@ -274,9 +274,9 @@ function renderTimeEntries(entries) {
                 <td>${entry.clock_out ? new Date(entry.clock_out).toLocaleString() : 'Active'}</td>
                 <td>${entry.location ? `<a href="https://www.google.com/maps?q=${JSON.parse(entry.location).latitude},${JSON.parse(entry.location).longitude}" target="_blank">View Map</a>` : ''}</td>
                 <td>
-                    <button onclick="editTimeEntry(${entry.id})">Edit</button>
-                    ${!entry.clock_out ? `<button class="secondary" onclick="manualClockOut(${entry.id})">Clock Out</button>` : ''}
-                    <button class="secondary" onclick="deleteTimeEntry(${entry.id})">Delete</button>
+                    <button onclick="editTimeEntry('${entry.id}')">Edit</button>
+                    ${!entry.clock_out ? `<button class="secondary" onclick="manualClockOut('${entry.id}')">Clock Out</button>` : ''}
+                    <button class="secondary" onclick="deleteTimeEntry('${entry.id}')">Delete</button>
                 </td>
             </tr>
         `;
