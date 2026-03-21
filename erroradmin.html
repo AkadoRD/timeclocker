@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <link rel="icon" href="icons/icon-192.png" type="image/png">
+    <link rel="stylesheet" href="admin.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="admin.js" defer></script>
+</head>
+<body>
+    <div id="app-container" style="display: none;">
+        <button id="logout-button" class="logout-btn secondary">Logout</button>
+        <div id="main-nav">
+            <button class="nav-button active" data-panel="dashboard-panel">Dashboard</button>
+            <button class="nav-button" data-panel="reports-panel">Reports</button>
+            <button class="nav-button" data-panel="employees-panel">Employees</button>
+            <button class="nav-button" data-panel="clients-panel">Clients</button>
+            <button class="nav-button" data-panel="time-entries-panel">Time Entries</button>
+            <button class="nav-button" data-panel="profile-panel">Profile</button>
+        </div>
+        <div id="dashboard-panel" class="panel active">
+            <h2>Dashboard</h2>
+            <div class="dashboard-section">
+                <h3>Today's Activity</h3>
+                <div id="todays-activity-list" class="dashboard-list"><p>Loading...</p></div>
+            </div>
+            <div class="dashboard-section">
+                <h3>Weekly Attendance</h3>
+                <div id="weekly-attendance-chart" class="chart-container"><p>Loading...</p></div>
+            </div>
+            <div class="dashboard-section">
+                <h3>Admin Tools</h3>
+                <button onclick="findDuplicateIds()">Find Duplicate Employee IDs</button>
+                <div id="duplicate-id-results"></div>
+            </div>
+        </div>
+        <div id="reports-panel" class="panel">
+            <h2>Export Time Report</h2>
+            <form>
+                <input type="date" id="start-date" placeholder="Start Date">
+                <input type="date" id="end-date" placeholder="End Date">
+                <button type="button" onclick="generateReport()" id="generate-report-btn">Generate Report</button>
+            </form>
+            <div id="report-results"></div>
+        </div>
+        <div id="employees-panel" class="panel">
+            <h2>Manage Employees</h2>
+            <form id="employee-form">
+                <input type="hidden" id="employee-id-hidden">
+                <input type="text" id="employee-name" placeholder="Employee Name" required>
+                <input type="text" id="employee-id" placeholder="Employee ID" required>
+                <select id="employee-client" required></select>
+                <button type="submit">Save Employee</button>
+            </form>
+            <table id="employees-table"><thead><tr><th>Name</th><th>ID</th><th>Client</th><th>Active</th><th>Actions</th></tr></thead><tbody></tbody></table>
+        </div>
+        <div id="clients-panel" class="panel">
+            <h2>Manage Clients</h2>
+            <form id="client-form">
+                <input type="hidden" id="client-id-hidden">
+                <input type="text" id="client-name" placeholder="Client Name" required>
+                <button type="submit">Save Client</button>
+            </form>
+            <table id="clients-table"><thead><tr><th>Name</th><th>Actions</th></tr></thead><tbody></tbody></table>
+        </div>
+        <div id="time-entries-panel" class="panel">
+            <h2>Manual Time Entries</h2>
+            <form id="time-entry-form">
+                <input type="hidden" id="time-entry-id-hidden">
+                <select id="time-entry-employee" required></select>
+                <input type="datetime-local" id="time-entry-clock-in" required>
+                <input type="datetime-local" id="time-entry-clock-out">
+                <button type="submit">Save Entry</button>
+            </form>
+            <h2>Recent Time Entries</h2>
+            <table id="time-entries-table"><thead><tr><th>Employee</th><th>Client</th><th>Clock In</th><th>Clock Out</th><th>Location</th><th>Actions</th></tr></thead><tbody></tbody></table>
+        </div>
+        <div id="profile-panel" class="panel">
+            <h2>Manage Profile</h2>
+            <form id="profile-form">
+                <input type="text" id="profile-name" placeholder="Your Name" required>
+                <input type="email" id="profile-email" placeholder="Your Login Email" disabled>
+                <input type="password" id="profile-password" placeholder="New Password">
+                <input type="password" id="profile-password-confirm" placeholder="Confirm New Password">
+                <button type="submit">Update Profile</button>
+            </form>
+        </div>
+    </div>
+    <div id="notification-container"></div>
+</body>
+</html>
