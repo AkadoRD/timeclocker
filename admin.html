@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard</title>
-    <link rel="manifest" href="manifest.json">
     <link rel="icon" href="icons/icon-192.png" type="image/png">
     <link rel="stylesheet" href="admin.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -89,13 +88,12 @@
             <h2>Manage Profile</h2>
             <form id="profile-form">
                 <input type="text" id="profile-name" placeholder="Your Name" required>
-                <input type="email" id="profile-email" placeholder="Your Login Email" disabled> <!-- Email is not updatable -->
-                <input type="password" id="profile-password" placeholder="New Password (leave blank to keep current)">
+                <input type="email" id="profile-email" placeholder="Your Login Email" disabled>
+                <input type="password" id="profile-password" placeholder="New Password">
                 <input type="password" id="profile-password-confirm" placeholder="Confirm New Password">
                 <button type="submit">Update Profile</button>
             </form>
         </div>
-
     </div>
     <div id="notification-container"></div>
 </body>
