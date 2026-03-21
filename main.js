@@ -11,29 +11,46 @@
 // === KIOSK MODE INITIALIZATION ===
 // Disable all gestures and movements for kiosk/tablet display
 (() => {
+    // Force no scroll immediately
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+    
     // Prevent context menu (right-click)
     document.addEventListener('contextmenu', e => e.preventDefault());
     
-    // Prevent all scroll
-    document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
-    document.addEventListener('scroll', () => window.scrollTo(0, 0), { passive: false });
+    // Aggressive scroll/move prevention
+    const preventScroll = (e) => e.preventDefault();
+    document.addEventListener('touchmove', preventScroll, { passive: false });
+    document.addEventListener('wheel', preventScroll, { passive: false });
+    document.addEventListener('scroll', () => {
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+    }, { passive: false });
     
-    // Prevent zoom
+    // Prevent zoom (pinch)
     document.addEventListener('gesturestart', e => e.preventDefault());
     document.addEventListener('touchstart', e => {
-        if (e.touches.length > 1) e.preventDefault();
+        if (e.touches.length > 1) {
+            e.preventDefault();
+            return false;
+        }
     }, { passive: false });
     
-    // Prevent pull-to-refresh (Android)
-    let lastY = 0;
-    document.addEventListener('touchstart', e => { lastY = e.touches[0].clientY; }, { passive: false });
-    document.addEventListener('touchmove', e => {
-        const diff = e.touches[0].clientY - lastY;
-        if (diff > 0 && window.scrollY === 0) e.preventDefault();
+    // Prevent double-tap zoom
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', e => {
+        const now = Date.now();
+        if (now - lastTouchEnd <= 300) e.preventDefault();
+        lastTouchEnd = now;
     }, { passive: false });
     
-    // Lock viewport position
-    window.scrollTo(0, 0);
+    // Ensure lock on any scroll attempt
+    setInterval(() => {
+        if (window.scrollY !== 0) window.scrollTo(0, 0);
+        if (document.documentElement.scrollTop !== 0) document.documentElement.scrollTop = 0;
+        if (document.body.scrollTop !== 0) document.body.scrollTop = 0;
+    }, 100);
 })();
 
 document.addEventListener('DOMContentLoaded', () => {

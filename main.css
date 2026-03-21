@@ -1,4 +1,4 @@
-html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; position: fixed; }
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; position: fixed; overscroll-behavior: none; }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f8f9fa; display: flex; align-items: center; justify-content: center; user-select: none; touch-action: none; -webkit-touch-callout: none; -webkit-user-select: none; -webkit-user-drag: none; }
 #mainCard { background: white; width: 90%; max-width: 450px; padding: 3rem 2rem; border-radius: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.05); text-align: center; box-sizing: border-box; user-select: none; }
 #clockContainer { margin-bottom: 2.5rem; user-select: none; }
