@@ -117,14 +117,23 @@ async function loadInitialData() {
 }
 
 async function renderDashboardAndTables(timeEntries) {
-    const today = new Date();
-    const sevenDaysAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+    try {
+        if (!timeEntries || !Array.isArray(timeEntries)) {
+            throw new Error('Invalid time entries data.');
+        }
 
-    const { data: weeklyEntries, error: weeklyErr } = await _supabase.from('time_entries').select('employee_id, clock_in').gte('clock_in', sevenDaysAgo.toISOString());
-    if (weeklyErr) throw weeklyErr;
+        const today = new Date();
+        const sevenDaysAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    renderDashboard(timeEntries, weeklyEntries);
-    renderAllManagementTables(timeEntries);
+        const { data: weeklyEntries, error: weeklyErr } = await _supabase.from('time_entries').select('employee_id, clock_in').gte('clock_in', sevenDaysAgo.toISOString());
+        if (weeklyErr) throw weeklyErr;
+
+        renderDashboard(timeEntries, weeklyEntries);
+        renderAllManagementTables(timeEntries);
+    } catch (error) {
+        console.error('❌ Error rendering dashboard:', error);
+        showToast('Error loading dashboard: ' + error.message, 'error');
+    }
 }
 
 function renderAllManagementTables(timeEntries) {
@@ -144,32 +153,39 @@ function renderDashboard(recentEntries, weeklyEntries) {
 
 async function saveProfile(event) {
     event.preventDefault();
-    const name = document.getElementById('profile-name').value;
-    const password = document.getElementById('profile-password').value;
-    const passwordConfirm = document.getElementById('profile-password-confirm').value;
-    
-    const updateData = {
-        data: { name: name }
-    };
-
-    if (password) {
-        if (password.length < 6) {
-            return showToast('Password must be at least 6 characters long.', 'error');
+    try {
+        const name = document.getElementById('profile-name').value;
+        const password = document.getElementById('profile-password').value;
+        const passwordConfirm = document.getElementById('profile-password-confirm').value;
+        
+        // Validation
+        if (!name || name.trim().length === 0) {
+            throw new Error('Name is required.');
         }
-        if (password !== passwordConfirm) {
-            return showToast('Passwords do not match.', 'error');
+
+        const updateData = {
+            data: { name: name.trim() }
+        };
+
+        if (password) {
+            if (password.length < 6) {
+                throw new Error('Password must be at least 6 characters long.');
+            }
+            if (password !== passwordConfirm) {
+                throw new Error('Passwords do not match.');
+            }
+            updateData.password = password;
         }
-        updateData.password = password;
-    }
 
-    const { error } = await _supabase.auth.updateUser(updateData);
+        const { error } = await _supabase.auth.updateUser(updateData);
+        if (error) throw error;
 
-    if (error) {
-        showToast('Failed to update profile: ' + error.message, 'error');
-    } else {
         showToast('Profile updated successfully!', 'success');
         document.getElementById('profile-password').value = '';
         document.getElementById('profile-password-confirm').value = '';
+    } catch (error) {
+        console.error('❌ Error updating profile:', error);
+        showToast('Failed to update profile: ' + error.message, 'error');
     }
 }
 
@@ -350,12 +366,17 @@ function editEmployee(id) {
 }
 
 async function toggleEmployeeActive(id, currentStatus) {
-    const { error } = await _supabase.from('employees').update({ active: !currentStatus }).eq('id', id);
-    if (error) {
-        showToast('Failed to update employee status.', 'error');
-    } else {
+    try {
+        if (!id) throw new Error('Invalid employee ID.');
+        
+        const { error } = await _supabase.from('employees').update({ active: !currentStatus }).eq('id', id);
+        if (error) throw error;
+        
         showToast(`Employee ${!currentStatus ? 'activated' : 'deactivated'}.`, 'success');
         await loadInitialData();
+    } catch (error) {
+        console.error('❌ Error toggling employee status:', error);
+        showToast('Failed to update employee status: ' + error.message, 'error');
     }
 }
 
@@ -388,10 +409,19 @@ function editClient(id, name) {
 }
 
 async function deleteClient(id) {
-    if (!confirm('Are you sure you want to delete this client?')) return;
-    const { error } = await _supabase.from('clients').delete().eq('id', id);
-    if (error) showToast('Error: ' + error.message, 'error');
-    else { showToast('Client deleted'); await loadInitialData(); }
+    try {
+        if (!confirm('Are you sure you want to delete this client?')) return;
+        if (!id) throw new Error('Invalid client ID.');
+        
+        const { error } = await _supabase.from('clients').delete().eq('id', id);
+        if (error) throw error;
+        
+        showToast('Client deleted successfully.', 'success');
+        await loadInitialData();
+    } catch (error) {
+        console.error('❌ Error deleting client:', error);
+        showToast('Error deleting client: ' + error.message, 'error');
+    }
 }
 
 // --- CRUD OPERATIONS: TIME ENTRIES ---
@@ -426,18 +456,26 @@ async function saveTimeEntry(event) {
 }
 
 async function editTimeEntry(id) {
-    const { data, error } = await _supabase.from('time_entries').select('*, employee:employees(*)').eq('id', id).single();
-    if (error) return showToast('Could not fetch data.', 'error');
+    try {
+        if (!id) throw new Error('Invalid time entry ID.');
+        
+        const { data, error } = await _supabase.from('time_entries').select('*, employee:employees(*)').eq('id', id).single();
+        if (error) throw error;
+        if (!data) throw new Error('Time entry not found.');
 
-    const formatForInput = (date) => date ? new Date(new Date(date).getTime() - (new Date(date).getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : '';
+        const formatForInput = (date) => date ? new Date(new Date(date).getTime() - (new Date(date).getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : '';
 
-    document.getElementById('time-entry-id-hidden').value = data.id;
-    document.getElementById('time-entry-employee').value = allEmployees.find(e => e.id === data.employee.id)?.id || '';
-    document.getElementById('time-entry-clock-in').value = formatForInput(new Date(data.clock_in));
-    document.getElementById('time-entry-clock-out').value = data.clock_out ? formatForInput(new Date(data.clock_out)) : '';
-    
-    // Subir al formulario de edición
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+        document.getElementById('time-entry-id-hidden').value = data.id;
+        document.getElementById('time-entry-employee').value = allEmployees.find(e => e.id === data.employee.id)?.id || '';
+        document.getElementById('time-entry-clock-in').value = formatForInput(new Date(data.clock_in));
+        document.getElementById('time-entry-clock-out').value = data.clock_out ? formatForInput(new Date(data.clock_out)) : '';
+        
+        // Subir al formulario de edición
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (error) {
+        console.error('❌ Error fetching time entry:', error);
+        showToast('Could not fetch time entry data: ' + error.message, 'error');
+    }
 }
 
 async function manualClockOut(entryId) {
@@ -453,10 +491,19 @@ async function manualClockOut(entryId) {
 }
 
 async function deleteTimeEntry(id) {
-    if (!confirm('Are you sure you want to delete this time entry?')) return;
-    const { error } = await _supabase.from('time_entries').delete().eq('id', id);
-    if (error) showToast('Error: ' + error.message, 'error');
-    else { showToast('Entry deleted'); await loadInitialData(); }
+    try {
+        if (!confirm('Are you sure you want to delete this time entry?')) return;
+        if (!id) throw new Error('Invalid time entry ID.');
+        
+        const { error } = await _supabase.from('time_entries').delete().eq('id', id);
+        if (error) throw error;
+        
+        showToast('Time entry deleted successfully.', 'success');
+        await loadInitialData();
+    } catch (error) {
+        console.error('❌ Error deleting time entry:', error);
+        showToast('Error deleting time entry: ' + error.message, 'error');
+    }
 }
 
 async function findDuplicateIds() {
