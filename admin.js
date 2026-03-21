@@ -7,6 +7,16 @@
  * - Reporting and data export.
  * - Dashboard with daily and weekly summaries.
  */
+// CONEXIÓN DE FUNCIONES CON EL HTML
+window.editEmployee = (id) => typeof editEmployee !== 'undefined' && editEmployee(id);
+window.toggleEmployeeActive = (id, s) => typeof toggleEmployeeActive !== 'undefined' && toggleEmployeeActive(id, s);
+window.editClient = (id, n) => typeof editClient !== 'undefined' && editClient(id, n);
+window.deleteClient = (id) => typeof deleteClient !== 'undefined' && deleteClient(id);
+window.editTimeEntry = (id) => typeof editTimeEntry !== 'undefined' && editTimeEntry(id);
+window.deleteTimeEntry = (id) => typeof deleteTimeEntry !== 'undefined' && deleteTimeEntry(id);
+window.manualClockOut = (id) => typeof manualClockOut !== 'undefined' && manualClockOut(id);
+window.findDuplicateIds = () => typeof findDuplicateIds !== 'undefined' && findDuplicateIds();
+window.generateReport = () => typeof generateReport !== 'undefined' && generateReport();
 
 // --- GLOBAL STATE & SETUP ---
 const SUPABASE_URL = 'https://jqppakaodpgbtxzpvsti.supabase.co';
